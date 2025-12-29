@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
     UserPlus,
     Search,
@@ -11,445 +12,592 @@ import {
     MapPin,
     Calendar,
     Clock,
-    CreditCard,
     Save,
     X,
     Check,
-    Banknote,
-    Building2,
-    Smartphone,
-    DollarSign
+    DollarSign,
+    FileText,
+    Users,
+    Globe,
+    Loader2,
+    AlertCircle,
+    CalendarCheck
 } from 'lucide-react';
-import { habitaciones, tarifas } from '@/data/mockData';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import './Checkin.css';
 
-function Checkin() {
-    const [step, setStep] = useState(1);
+function Checkin({ initialHabitaciones = [], initialReservas = [], initialTarifas = [] }) {
+    const router = useRouter();
+    const [habitaciones, setHabitaciones] = useState(initialHabitaciones);
+    const [reservas, setReservas] = useState(initialReservas);
+    const [tarifas, setTarifas] = useState(initialTarifas);
+
     const [selectedRoom, setSelectedRoom] = useState(null);
-    const [selectedTarifa, setSelectedTarifa] = useState('temporadaMedia'); // temporadaBaja, temporadaMedia, temporadaAlta
+    const [selectedReserva, setSelectedReserva] = useState(null);
+    const [activeTab, setActiveTab] = useState('directo'); // 'directo' or 'reserva'
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
+    const [searchingGuest, setSearchingGuest] = useState(false);
+
+    // Form data
     const [formData, setFormData] = useState({
+        tipo_documento: 'DNI',
+        numero_documento: '',
         nombre: '',
-        dni: '',
+        apellidos: '',
         telefono: '',
         email: '',
         procedencia: '',
-        numHuespedes: 1,
-        fechaLlegada: new Date().toISOString().split('T')[0],
-        horaLlegada: new Date().toTimeString().slice(0, 5),
-        fechaSalida: '',
-        horaSalida: '12:00',
-        observaciones: '',
-        metodoPago: 'efectivo'
+        nacionalidad: 'Perú',
+        es_extranjero: false,
+        noches: 1,
+        adultos: 1,
+        ninos: 0,
+        notas: ''
     });
 
-    const availableRooms = habitaciones.filter(r => r.estado === 'disponible');
+    const [fechaSalida, setFechaSalida] = useState(() => {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        return tomorrow.toISOString().split('T')[0];
+    });
 
-    const handleInputChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+    // Confirm dialog
+    const [confirmDialog, setConfirmDialog] = useState({
+        isOpen: false,
+        title: '',
+        message: '',
+        variant: 'success',
+        onConfirm: () => { },
+        loading: false
+    });
+
+    // Clear messages
+    useEffect(() => {
+        if (successMessage) {
+            const timer = setTimeout(() => setSuccessMessage(''), 4000);
+            return () => clearTimeout(timer);
+        }
+    }, [successMessage]);
+
+    useEffect(() => {
+        if (error) {
+            const timer = setTimeout(() => setError(''), 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [error]);
+
+    // Update nights when date changes
+    useEffect(() => {
+        const today = new Date();
+        const salida = new Date(fechaSalida);
+        const noches = Math.ceil((salida - today) / (1000 * 60 * 60 * 24));
+        setFormData(prev => ({ ...prev, noches: Math.max(1, noches) }));
+    }, [fechaSalida]);
+
+    // Search guest by document
+    const searchGuest = async () => {
+        if (!formData.numero_documento || formData.numero_documento.length < 6) return;
+
+        try {
+            setSearchingGuest(true);
+            const response = await fetch(`/api/huespedes?documento=${formData.numero_documento}`);
+            const data = await response.json();
+
+            if (data.huespedes && data.huespedes.length > 0) {
+                const guest = data.huespedes[0];
+                setFormData(prev => ({
+                    ...prev,
+                    nombre: guest.nombre || '',
+                    apellidos: guest.apellidos || '',
+                    telefono: guest.telefono || '',
+                    email: guest.email || '',
+                    procedencia: guest.procedencia || '',
+                    nacionalidad: guest.nacionalidad || 'Perú',
+                    es_extranjero: guest.es_extranjero || false
+                }));
+                setSuccessMessage('Huésped encontrado - datos cargados');
+            }
+        } catch (err) {
+            console.error('Error searching guest:', err);
+        } finally {
+            setSearchingGuest(false);
+        }
     };
 
-    const getPrecioByTarifa = (room) => {
-        if (!room) return 0;
-        const tarifa = tarifas.find(t => t.tipo === room.tipo);
-        if (!tarifa) return room.precioActual;
-        return tarifa[selectedTarifa] || tarifa.precioBase;
+    const handleInputChange = (e) => {
+        const { name, value, type, checked } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: type === 'checkbox' ? checked : value
+        }));
+    };
+
+    const getPrecio = () => {
+        if (selectedRoom) {
+            return selectedRoom.precio_base || 0;
+        }
+        return 0;
     };
 
     const calculateTotal = () => {
-        if (!selectedRoom || !formData.fechaSalida) return 0;
-        const llegada = new Date(formData.fechaLlegada);
-        const salida = new Date(formData.fechaSalida);
-        const dias = Math.ceil((salida - llegada) / (1000 * 60 * 60 * 24));
-        const precioNoche = getPrecioByTarifa(selectedRoom);
-        return dias * precioNoche;
+        const precio = getPrecio();
+        return precio * formData.noches;
     };
+
+    const handleSelectReserva = (reserva) => {
+        setSelectedReserva(reserva);
+        setSelectedRoom(reserva.habitacion);
+
+        // Pre-fill form with reservation data
+        setFormData(prev => ({
+            ...prev,
+            nombre: reserva.nombre_cliente || '',
+            telefono: reserva.telefono_cliente || '',
+            email: reserva.email_cliente || '',
+            numero_documento: reserva.documento_cliente || ''
+        }));
+
+        // Calculate nights from reservation
+        const inicio = new Date(reserva.fecha_inicio);
+        const fin = new Date(reserva.fecha_fin);
+        const noches = Math.ceil((fin - inicio) / (1000 * 60 * 60 * 24));
+        setFormData(prev => ({ ...prev, noches }));
+        setFechaSalida(reserva.fecha_fin);
+    };
+
+    const handleSubmitCheckin = async () => {
+        // Validation
+        if (!formData.numero_documento || !formData.nombre) {
+            setError('DNI/Documento y nombre son obligatorios');
+            return;
+        }
+
+        if (!selectedRoom) {
+            setError('Debes seleccionar una habitación');
+            return;
+        }
+
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Confirmar Check-in',
+            message: `¿Confirmar check-in de ${formData.nombre} en la habitación ${selectedRoom.numero}?`,
+            variant: 'success',
+            confirmText: 'Confirmar Check-in',
+            loading: false,
+            onConfirm: async () => {
+                try {
+                    setConfirmDialog(prev => ({ ...prev, loading: true }));
+
+                    const response = await fetch('/api/estadias/checkin', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            ...formData,
+                            habitacion_id: selectedRoom.id,
+                            reserva_id: selectedReserva?.id || null,
+                            fecha_checkout_prevista: fechaSalida,
+                            precio_noche: getPrecio()
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.error || 'Error en el check-in');
+                    }
+
+                    setSuccessMessage(`Check-in exitoso! Habitación ${selectedRoom.numero} ocupada.`);
+                    setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+
+                    // Reset form
+                    setFormData({
+                        tipo_documento: 'DNI',
+                        numero_documento: '',
+                        nombre: '',
+                        apellidos: '',
+                        telefono: '',
+                        email: '',
+                        procedencia: '',
+                        nacionalidad: 'Perú',
+                        es_extranjero: false,
+                        noches: 1,
+                        adultos: 1,
+                        ninos: 0,
+                        notas: ''
+                    });
+                    setSelectedRoom(null);
+                    setSelectedReserva(null);
+
+                    // Refresh data
+                    router.refresh();
+
+                } catch (err) {
+                    setError(err.message);
+                    setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+                }
+            }
+        });
+    };
+
+    const habitacionesDisponibles = habitaciones.filter(h => h.estado === 'disponible');
 
     return (
         <div className="checkin-page">
             <div className="page-header">
                 <div>
-                    <h1 className="page-title">Nuevo Check-in</h1>
-                    <p className="page-subtitle">Registra la entrada de un nuevo huésped</p>
+                    <h1 className="page-title">Check-in</h1>
+                    <p className="page-subtitle">Registro de entrada de huéspedes</p>
                 </div>
             </div>
 
-            {/* Progress Steps */}
-            <div className="progress-steps">
-                <div className={`progress-step ${step >= 1 ? 'active' : ''} ${step > 1 ? 'completed' : ''}`}>
-                    <div className="step-number">{step > 1 ? <Check size={16} /> : '1'}</div>
-                    <span className="step-label">Seleccionar Habitación</span>
+            {/* Messages */}
+            {error && (
+                <div className="alert alert-error mb-4">
+                    <AlertCircle size={20} />
+                    <span>{error}</span>
                 </div>
-                <div className="progress-line"></div>
-                <div className={`progress-step ${step >= 2 ? 'active' : ''} ${step > 2 ? 'completed' : ''}`}>
-                    <div className="step-number">{step > 2 ? <Check size={16} /> : '2'}</div>
-                    <span className="step-label">Datos del Huésped</span>
-                </div>
-                <div className="progress-line"></div>
-                <div className={`progress-step ${step >= 3 ? 'active' : ''}`}>
-                    <div className="step-number">3</div>
-                    <span className="step-label">Confirmar y Pagar</span>
-                </div>
-            </div>
-
-            {/* Step 1: Select Room */}
-            {step === 1 && (
-                <div className="step-content">
-                    <h2 className="step-title">Selecciona una habitación disponible</h2>
-
-                    {/* Tarifa Selector */}
-                    <div className="card" style={{ marginBottom: '1.5rem' }}>
-                        <div className="card-header">
-                            <div>
-                                <h3 className="card-title">Tipo de Tarifa</h3>
-                                <p className="card-subtitle">Selecciona la temporada para ver los precios correspondientes</p>
-                            </div>
-                        </div>
-                        <div className="payment-methods" style={{ padding: '1rem' }}>
-                            <label
-                                className={`payment-method ${selectedTarifa === 'temporadaBaja' ? 'selected' : ''}`}
-                                onClick={() => setSelectedTarifa('temporadaBaja')}
-                            >
-                                <input
-                                    type="radio"
-                                    name="tarifa"
-                                    value="temporadaBaja"
-                                    checked={selectedTarifa === 'temporadaBaja'}
-                                    onChange={() => setSelectedTarifa('temporadaBaja')}
-                                />
-                                <span className="payment-icon">
-                                    <DollarSign size={20} />
-                                </span>
-                                <span className="payment-name">Temporada Baja</span>
-                            </label>
-                            <label
-                                className={`payment-method ${selectedTarifa === 'temporadaMedia' ? 'selected' : ''}`}
-                                onClick={() => setSelectedTarifa('temporadaMedia')}
-                            >
-                                <input
-                                    type="radio"
-                                    name="tarifa"
-                                    value="temporadaMedia"
-                                    checked={selectedTarifa === 'temporadaMedia'}
-                                    onChange={() => setSelectedTarifa('temporadaMedia')}
-                                />
-                                <span className="payment-icon">
-                                    <DollarSign size={20} />
-                                </span>
-                                <span className="payment-name">Temporada Media</span>
-                            </label>
-                            <label
-                                className={`payment-method ${selectedTarifa === 'temporadaAlta' ? 'selected' : ''}`}
-                                onClick={() => setSelectedTarifa('temporadaAlta')}
-                            >
-                                <input
-                                    type="radio"
-                                    name="tarifa"
-                                    value="temporadaAlta"
-                                    checked={selectedTarifa === 'temporadaAlta'}
-                                    onChange={() => setSelectedTarifa('temporadaAlta')}
-                                />
-                                <span className="payment-icon">
-                                    <DollarSign size={20} />
-                                </span>
-                                <span className="payment-name">Temporada Alta</span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <div className="available-rooms-grid">
-                        {availableRooms.map((room) => (
-                            <div
-                                key={room.id}
-                                className={`room-select-card ${selectedRoom?.id === room.id ? 'selected' : ''}`}
-                                onClick={() => setSelectedRoom(room)}
-                            >
-                                <div className="room-select-header">
-                                    <span className="room-number">{room.numero}</span>
-                                    <span className="badge badge-disponible">Disponible</span>
-                                </div>
-                                <div className="room-select-body">
-                                    <div className="room-select-type">{room.tipo}</div>
-                                    <div className="room-select-details">
-                                        <span><User size={14} /> {room.capacidad} personas</span>
-                                        <span>Piso {room.piso}</span>
-                                    </div>
-                                    <div className="room-select-price">
-                                        S/ {getPrecioByTarifa(room)}
-                                        <span className="per-night">/ noche</span>
-                                    </div>
-                                </div>
-                                {selectedRoom?.id === room.id && (
-                                    <div className="room-selected-badge">
-                                        <Check size={20} />
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                    <div className="step-actions">
-                        <button
-                            className="btn btn-primary btn-lg"
-                            disabled={!selectedRoom}
-                            onClick={() => setStep(2)}
-                        >
-                            Continuar
-                        </button>
-                    </div>
+            )}
+            {successMessage && (
+                <div className="alert alert-success mb-4">
+                    <Check size={20} />
+                    <span>{successMessage}</span>
                 </div>
             )}
 
-            {/* Step 2: Guest Data */}
-            {step === 2 && (
-                <div className="step-content">
-                    <h2 className="step-title">Datos del Huésped</h2>
-                    <div className="checkin-form-grid">
-                        <div className="card form-card">
-                            <h3 className="form-section-title">
-                                <User size={18} />
-                                Información Personal
-                            </h3>
+            {/* Tabs */}
+            <div className="tabs mb-4">
+                <button
+                    className={`tab ${activeTab === 'directo' ? 'active' : ''}`}
+                    onClick={() => { setActiveTab('directo'); setSelectedReserva(null); }}
+                >
+                    <UserPlus size={18} />
+                    Check-in Directo
+                </button>
+                <button
+                    className={`tab ${activeTab === 'reserva' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('reserva')}
+                >
+                    <CalendarCheck size={18} />
+                    Desde Reserva ({reservas.length})
+                </button>
+            </div>
+
+            <div className="checkin-content">
+                {/* Left Panel - Room Selection / Reservations */}
+                <div className="checkin-panel">
+                    {activeTab === 'reserva' ? (
+                        <div className="card">
+                            <div className="card-header">
+                                <h3 className="card-title">Reservas Pendientes</h3>
+                            </div>
+                            {reservas.length === 0 ? (
+                                <div className="empty-state-sm">
+                                    <CalendarCheck size={32} style={{ opacity: 0.3 }} />
+                                    <p>No hay reservas pendientes</p>
+                                </div>
+                            ) : (
+                                <div className="reservas-list">
+                                    {reservas.map(reserva => (
+                                        <div
+                                            key={reserva.id}
+                                            className={`reserva-item ${selectedReserva?.id === reserva.id ? 'selected' : ''}`}
+                                            onClick={() => handleSelectReserva(reserva)}
+                                        >
+                                            <div className="reserva-info">
+                                                <span className="reserva-nombre">{reserva.nombre_cliente}</span>
+                                                <span className="reserva-fechas">
+                                                    {new Date(reserva.fecha_inicio).toLocaleDateString('es-PE')} - {new Date(reserva.fecha_fin).toLocaleDateString('es-PE')}
+                                                </span>
+                                            </div>
+                                            <div className="reserva-hab">
+                                                <BedDouble size={16} />
+                                                <span>{reserva.habitacion?.numero}</span>
+                                            </div>
+                                            <span className={`badge badge-${reserva.estado === 'confirmada' ? 'success' : 'warning'}`}>
+                                                {reserva.estado}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="card">
+                            <div className="card-header">
+                                <h3 className="card-title">Habitaciones Disponibles</h3>
+                                <span className="card-subtitle">{habitacionesDisponibles.length} disponibles</span>
+                            </div>
+                            {habitacionesDisponibles.length === 0 ? (
+                                <div className="empty-state-sm">
+                                    <BedDouble size={32} style={{ opacity: 0.3 }} />
+                                    <p>No hay habitaciones disponibles</p>
+                                </div>
+                            ) : (
+                                <div className="rooms-selection">
+                                    {habitacionesDisponibles.map(room => (
+                                        <div
+                                            key={room.id}
+                                            className={`room-select-card ${selectedRoom?.id === room.id ? 'selected' : ''}`}
+                                            onClick={() => setSelectedRoom(room)}
+                                        >
+                                            <div className="room-number">{room.numero}</div>
+                                            <div className="room-type">{room.tipo}</div>
+                                            <div className="room-price">S/ {room.precio_base}</div>
+                                            <div className="room-capacity">
+                                                <Users size={14} />
+                                                {room.capacidad}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* Right Panel - Guest Form */}
+                <div className="checkin-form-panel">
+                    <div className="card">
+                        <div className="card-header">
+                            <h3 className="card-title">Datos del Huésped</h3>
+                        </div>
+                        <div className="card-body">
+                            {/* Document Search */}
                             <div className="form-row">
                                 <div className="form-group">
-                                    <label className="form-label">Nombre Completo *</label>
+                                    <label className="form-label">Tipo Documento</label>
+                                    <select
+                                        className="form-select"
+                                        name="tipo_documento"
+                                        value={formData.tipo_documento}
+                                        onChange={handleInputChange}
+                                    >
+                                        <option value="DNI">DNI</option>
+                                        <option value="PASAPORTE">Pasaporte</option>
+                                        <option value="CE">Carnet Extranjería</option>
+                                    </select>
+                                </div>
+                                <div className="form-group flex-2">
+                                    <label className="form-label">Número Documento *</label>
+                                    <div className="input-with-button">
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            name="numero_documento"
+                                            value={formData.numero_documento}
+                                            onChange={handleInputChange}
+                                            placeholder="Ingresa el documento"
+                                            onBlur={searchGuest}
+                                        />
+                                        <button
+                                            className="btn btn-icon"
+                                            onClick={searchGuest}
+                                            disabled={searchingGuest}
+                                        >
+                                            {searchingGuest ? <Loader2 size={18} className="spinner" /> : <Search size={18} />}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label className="form-label">Nombres *</label>
                                     <input
                                         type="text"
                                         className="form-input"
                                         name="nombre"
                                         value={formData.nombre}
                                         onChange={handleInputChange}
-                                        placeholder="Ej: Juan Pérez García"
+                                        placeholder="Nombres"
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">DNI / Pasaporte *</label>
+                                    <label className="form-label">Apellidos</label>
                                     <input
                                         type="text"
                                         className="form-input"
-                                        name="dni"
-                                        value={formData.dni}
+                                        name="apellidos"
+                                        value={formData.apellidos}
                                         onChange={handleInputChange}
-                                        placeholder="Ej: 12345678"
+                                        placeholder="Apellidos"
                                     />
                                 </div>
                             </div>
+
                             <div className="form-row">
                                 <div className="form-group">
-                                    <label className="form-label">Teléfono</label>
+                                    <label className="form-label"><Phone size={14} /> Teléfono</label>
                                     <input
                                         type="tel"
                                         className="form-input"
                                         name="telefono"
                                         value={formData.telefono}
                                         onChange={handleInputChange}
-                                        placeholder="Ej: 987654321"
+                                        placeholder="987654321"
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">Email</label>
+                                    <label className="form-label"><Mail size={14} /> Email</label>
                                     <input
                                         type="email"
                                         className="form-input"
                                         name="email"
                                         value={formData.email}
                                         onChange={handleInputChange}
-                                        placeholder="Ej: correo@ejemplo.com"
+                                        placeholder="correo@email.com"
                                     />
                                 </div>
                             </div>
+
                             <div className="form-row">
                                 <div className="form-group">
-                                    <label className="form-label">Procedencia</label>
+                                    <label className="form-label"><MapPin size={14} /> Procedencia</label>
                                     <input
                                         type="text"
                                         className="form-input"
                                         name="procedencia"
                                         value={formData.procedencia}
                                         onChange={handleInputChange}
-                                        placeholder="Ej: Lima, Perú"
+                                        placeholder="Ciudad de origen"
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">Número de Huéspedes</label>
-                                    <select
-                                        className="form-select"
-                                        name="numHuespedes"
-                                        value={formData.numHuespedes}
+                                    <label className="form-label"><Globe size={14} /> Nacionalidad</label>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        name="nacionalidad"
+                                        value={formData.nacionalidad}
                                         onChange={handleInputChange}
-                                    >
-                                        {[...Array(selectedRoom?.capacidad || 4)].map((_, i) => (
-                                            <option key={i + 1} value={i + 1}>{i + 1} {i === 0 ? 'huésped' : 'huéspedes'}</option>
-                                        ))}
-                                    </select>
+                                    />
                                 </div>
                             </div>
-                        </div>
 
-                        <div className="card form-card">
-                            <h3 className="form-section-title">
-                                <Calendar size={18} />
-                                Fechas de Estadía
-                            </h3>
+                            <div className="form-divider"></div>
+
+                            <h4 className="form-section-title"><Calendar size={16} /> Estadía</h4>
+
                             <div className="form-row">
                                 <div className="form-group">
-                                    <label className="form-label">Fecha de Llegada *</label>
+                                    <label className="form-label">Fecha Salida</label>
                                     <input
                                         type="date"
                                         className="form-input"
-                                        name="fechaLlegada"
-                                        value={formData.fechaLlegada}
-                                        onChange={handleInputChange}
+                                        value={fechaSalida}
+                                        onChange={(e) => setFechaSalida(e.target.value)}
+                                        min={new Date().toISOString().split('T')[0]}
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">Hora de Llegada</label>
+                                    <label className="form-label">Noches</label>
                                     <input
-                                        type="time"
+                                        type="number"
                                         className="form-input"
-                                        name="horaLlegada"
-                                        value={formData.horaLlegada}
+                                        name="noches"
+                                        value={formData.noches}
                                         onChange={handleInputChange}
+                                        min="1"
                                     />
                                 </div>
                             </div>
+
                             <div className="form-row">
                                 <div className="form-group">
-                                    <label className="form-label">Fecha de Salida *</label>
+                                    <label className="form-label">Adultos</label>
                                     <input
-                                        type="date"
+                                        type="number"
                                         className="form-input"
-                                        name="fechaSalida"
-                                        value={formData.fechaSalida}
+                                        name="adultos"
+                                        value={formData.adultos}
                                         onChange={handleInputChange}
-                                        min={formData.fechaLlegada}
+                                        min="1"
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">Hora de Salida</label>
+                                    <label className="form-label">Niños</label>
                                     <input
-                                        type="time"
+                                        type="number"
                                         className="form-input"
-                                        name="horaSalida"
-                                        value={formData.horaSalida}
+                                        name="ninos"
+                                        value={formData.ninos}
                                         onChange={handleInputChange}
+                                        min="0"
                                     />
                                 </div>
                             </div>
+
                             <div className="form-group">
-                                <label className="form-label">Observaciones</label>
+                                <label className="form-label"><FileText size={14} /> Notas</label>
                                 <textarea
-                                    className="form-textarea"
-                                    name="observaciones"
-                                    value={formData.observaciones}
+                                    className="form-input"
+                                    name="notas"
+                                    value={formData.notas}
                                     onChange={handleInputChange}
-                                    placeholder="Notas adicionales..."
-                                    rows={3}
+                                    rows="2"
+                                    placeholder="Observaciones..."
                                 />
                             </div>
+
+                            {/* Summary */}
+                            {selectedRoom && (
+                                <div className="checkin-summary">
+                                    <div className="summary-row">
+                                        <span>Habitación:</span>
+                                        <span><strong>{selectedRoom.numero}</strong> - {selectedRoom.tipo}</span>
+                                    </div>
+                                    <div className="summary-row">
+                                        <span>Precio/noche:</span>
+                                        <span>S/ {getPrecio().toFixed(2)}</span>
+                                    </div>
+                                    <div className="summary-row">
+                                        <span>Noches:</span>
+                                        <span>{formData.noches}</span>
+                                    </div>
+                                    <div className="summary-row total">
+                                        <span>Total Estimado:</span>
+                                        <span>S/ {calculateTotal().toFixed(2)}</span>
+                                    </div>
+                                </div>
+                            )}
+
+                            <button
+                                className="btn btn-primary btn-lg btn-block"
+                                onClick={handleSubmitCheckin}
+                                disabled={!selectedRoom || !formData.numero_documento || !formData.nombre || loading}
+                            >
+                                {loading ? (
+                                    <>
+                                        <Loader2 size={20} className="spinner" />
+                                        Procesando...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Check size={20} />
+                                        Confirmar Check-in
+                                    </>
+                                )}
+                            </button>
                         </div>
-                    </div>
-                    <div className="step-actions">
-                        <button className="btn btn-secondary" onClick={() => setStep(1)}>
-                            Atrás
-                        </button>
-                        <button
-                            className="btn btn-primary btn-lg"
-                            disabled={!formData.nombre || !formData.dni || !formData.fechaSalida}
-                            onClick={() => setStep(3)}
-                        >
-                            Continuar
-                        </button>
                     </div>
                 </div>
-            )}
+            </div>
 
-            {/* Step 3: Confirm and Pay */}
-            {step === 3 && (
-                <div className="step-content">
-                    <h2 className="step-title">Confirmar Check-in</h2>
-                    <div className="confirm-grid">
-                        <div className="card confirm-card">
-                            <h3 className="confirm-section-title">Resumen de la Reserva</h3>
-                            <div className="confirm-details">
-                                <div className="confirm-item">
-                                    <BedDouble size={18} />
-                                    <div>
-                                        <span className="confirm-label">Habitación</span>
-                                        <span className="confirm-value">{selectedRoom?.numero} - {selectedRoom?.tipo}</span>
-                                    </div>
-                                </div>
-                                <div className="confirm-item">
-                                    <User size={18} />
-                                    <div>
-                                        <span className="confirm-label">Huésped</span>
-                                        <span className="confirm-value">{formData.nombre}</span>
-                                    </div>
-                                </div>
-                                <div className="confirm-item">
-                                    <Calendar size={18} />
-                                    <div>
-                                        <span className="confirm-label">Fechas</span>
-                                        <span className="confirm-value">
-                                            {new Date(formData.fechaLlegada).toLocaleDateString('es-PE')} - {new Date(formData.fechaSalida).toLocaleDateString('es-PE')}
-                                        </span>
-                                    </div>
-                                </div>
-                                <div className="confirm-item">
-                                    <User size={18} />
-                                    <div>
-                                        <span className="confirm-label">Huéspedes</span>
-                                        <span className="confirm-value">{formData.numHuespedes} persona(s)</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="confirm-total">
-                                <span>Total a Pagar</span>
-                                <span className="total-amount">S/ {calculateTotal()}</span>
-                            </div>
-                        </div>
-
-                        <div className="card confirm-card">
-                            <h3 className="confirm-section-title">Método de Pago</h3>
-                            <div className="payment-methods">
-                                {['efectivo', 'tarjeta', 'transferencia', 'yape', 'plin'].map((method) => (
-                                    <label
-                                        key={method}
-                                        className={`payment-method ${formData.metodoPago === method ? 'selected' : ''}`}
-                                    >
-                                        <input
-                                            type="radio"
-                                            name="metodoPago"
-                                            value={method}
-                                            checked={formData.metodoPago === method}
-                                            onChange={handleInputChange}
-                                        />
-                                        <span className="payment-icon">
-                                            {method === 'efectivo' && <Banknote size={20} />}
-                                            {method === 'tarjeta' && <CreditCard size={20} />}
-                                            {method === 'transferencia' && <Building2 size={20} />}
-                                            {method === 'yape' && <Smartphone size={20} />}
-                                            {method === 'plin' && <Smartphone size={20} />}
-                                        </span>
-                                        <span className="payment-name">{method.charAt(0).toUpperCase() + method.slice(1)}</span>
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                    <div className="step-actions">
-                        <button className="btn btn-secondary" onClick={() => setStep(2)}>
-                            Atrás
-                        </button>
-                        <button className="btn btn-success btn-lg">
-                            <Check size={18} />
-                            Confirmar Check-in
-                        </button>
-                    </div>
-                </div>
-            )}
+            {/* Confirm Dialog */}
+            <ConfirmDialog
+                isOpen={confirmDialog.isOpen}
+                onClose={() => !confirmDialog.loading && setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+                onConfirm={confirmDialog.onConfirm}
+                title={confirmDialog.title}
+                message={confirmDialog.message}
+                variant={confirmDialog.variant}
+                confirmText={confirmDialog.confirmText}
+                loading={confirmDialog.loading}
+            />
         </div>
     );
 }
 
 export default Checkin;
-

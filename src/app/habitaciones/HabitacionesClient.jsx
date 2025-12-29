@@ -1,45 +1,119 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
     BedDouble,
     Search,
-    Filter,
     Grid3X3,
     List,
     Plus,
     Users,
     DollarSign,
-    Clock,
     Eye,
     Edit,
     Trash2,
     X,
     Bed,
     Crown,
-    Heart
+    Heart,
+    Loader2,
+    AlertCircle,
+    Check,
+    RefreshCw,
+    Save,
+    Wrench
 } from 'lucide-react';
-import { habitaciones, huespedes, tarifas } from '@/data/mockData';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import './Habitaciones.css';
 
-function Habitaciones() {
+function Habitaciones({ initialHabitaciones = [], initialTarifas = [], initialEstadias = [] }) {
+    const router = useRouter();
+    const [habitaciones, setHabitaciones] = useState(initialHabitaciones);
+    const [tarifas, setTarifas] = useState(initialTarifas);
+    const [estadiasActivas, setEstadiasActivas] = useState(initialEstadias);
+
     const [viewMode, setViewMode] = useState('grid');
     const [filterEstado, setFilterEstado] = useState('todos');
     const [filterTipo, setFilterTipo] = useState('todos');
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedRoom, setSelectedRoom] = useState(null);
+
+    // Modal states
     const [showNewRoomModal, setShowNewRoomModal] = useState(false);
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [modalMode, setModalMode] = useState('create');
+    const [formLoading, setFormLoading] = useState(false);
+    const [formError, setFormError] = useState('');
+
+    // Messages
+    const [error, setError] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    // Form data
+    const [formData, setFormData] = useState({
+        numero: '',
+        tipo: 'simple',
+        capacidad: 1,
+        piso: 1,
+        precio_base: '',
+        descripcion: '',
+        amenidades: []
+    });
+
+    // Confirm dialog
+    const [confirmDialog, setConfirmDialog] = useState({
+        isOpen: false,
+        title: '',
+        message: '',
+        variant: 'danger',
+        onConfirm: () => { },
+        loading: false
+    });
+
+    // Clear messages
+    useEffect(() => {
+        if (successMessage) {
+            const timer = setTimeout(() => setSuccessMessage(''), 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [successMessage]);
+
+    useEffect(() => {
+        if (error) {
+            const timer = setTimeout(() => setError(''), 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [error]);
+
+    // Get guest for occupied room
+    const getHuespedForRoom = (roomId) => {
+        const estadia = estadiasActivas.find(e => e.habitacion_id === roomId);
+        return estadia?.huesped || null;
+    };
+
+    const fetchHabitaciones = async () => {
+        try {
+            setLoading(true);
+            const response = await fetch('/api/habitaciones');
+            const data = await response.json();
+            if (data.habitaciones) {
+                setHabitaciones(data.habitaciones);
+            }
+        } catch (err) {
+            setError('Error al cargar habitaciones');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const filteredRooms = habitaciones.filter(room => {
         const matchesEstado = filterEstado === 'todos' || room.estado === filterEstado;
         const matchesTipo = filterTipo === 'todos' || room.tipo === filterTipo;
-        const matchesSearch = room.numero.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesSearch = room.numero?.toLowerCase().includes(searchTerm.toLowerCase());
         return matchesEstado && matchesTipo && matchesSearch;
     });
-
-    const getHuesped = (huespedId) => {
-        return huespedes.find(h => h.id === huespedId);
-    };
 
     const roomCounts = {
         todos: habitaciones.length,
@@ -59,6 +133,180 @@ function Habitaciones() {
         }
     };
 
+    const getEstadoColor = (estado) => {
+        switch (estado) {
+            case 'disponible': return 'success';
+            case 'ocupada': return 'danger';
+            case 'limpieza': return 'warning';
+            case 'mantenimiento': return 'secondary';
+            default: return 'secondary';
+        }
+    };
+
+    const handleInputChange = (e) => {
+        const { name, value, type } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: type === 'number' ? parseFloat(value) || '' : value
+        }));
+    };
+
+    const openCreateModal = () => {
+        setModalMode('create');
+        setFormData({
+            numero: '',
+            tipo: 'simple',
+            capacidad: 1,
+            piso: 1,
+            precio_base: '',
+            descripcion: '',
+            amenidades: []
+        });
+        setFormError('');
+        setShowNewRoomModal(true);
+    };
+
+    const openEditModal = (room) => {
+        setModalMode('edit');
+        setSelectedRoom(room);
+        setFormData({
+            numero: room.numero,
+            tipo: room.tipo,
+            capacidad: room.capacidad,
+            piso: room.piso,
+            precio_base: room.precio_base,
+            descripcion: room.descripcion || '',
+            amenidades: room.amenidades || []
+        });
+        setFormError('');
+        setShowEditModal(true);
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setFormLoading(true);
+        setFormError('');
+
+        try {
+            if (modalMode === 'create') {
+                const response = await fetch('/api/habitaciones', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error);
+
+                setSuccessMessage(`Habitación ${formData.numero} creada exitosamente`);
+                setShowNewRoomModal(false);
+            } else {
+                const response = await fetch(`/api/habitaciones/${selectedRoom.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        tipo: formData.tipo,
+                        precio_base: formData.precio_base,
+                        descripcion: formData.descripcion,
+                        amenidades: formData.amenidades
+                    })
+                });
+
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error);
+
+                setSuccessMessage(`Habitación ${formData.numero} actualizada`);
+                setShowEditModal(false);
+            }
+
+            router.refresh();
+            fetchHabitaciones();
+        } catch (err) {
+            setFormError(err.message);
+        } finally {
+            setFormLoading(false);
+        }
+    };
+
+    const handleSetMantenimiento = (room) => {
+        if (room.estado === 'ocupada') {
+            setError('No se puede poner en mantenimiento una habitación ocupada');
+            return;
+        }
+
+        setConfirmDialog({
+            isOpen: true,
+            title: room.estado === 'mantenimiento' ? 'Quitar de Mantenimiento' : 'Poner en Mantenimiento',
+            message: room.estado === 'mantenimiento'
+                ? `¿Marcar habitación ${room.numero} como disponible?`
+                : `¿Poner habitación ${room.numero} en mantenimiento?`,
+            variant: room.estado === 'mantenimiento' ? 'success' : 'warning',
+            confirmText: room.estado === 'mantenimiento' ? 'Marcar Disponible' : 'Confirmar',
+            loading: false,
+            onConfirm: async () => {
+                try {
+                    setConfirmDialog(prev => ({ ...prev, loading: true }));
+
+                    const newEstado = room.estado === 'mantenimiento' ? 'disponible' : 'mantenimiento';
+
+                    const response = await fetch(`/api/habitaciones/${room.id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ estado: newEstado })
+                    });
+
+                    if (!response.ok) throw new Error('Error al cambiar estado');
+
+                    setSuccessMessage(`Habitación ${room.numero} ahora está en ${newEstado}`);
+                    router.refresh();
+                    fetchHabitaciones();
+                    setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+                } catch (err) {
+                    setError(err.message);
+                    setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+                }
+            }
+        });
+    };
+
+    const handleDelete = (room) => {
+        if (room.estado === 'ocupada') {
+            setError('No se puede eliminar una habitación ocupada');
+            return;
+        }
+
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Eliminar Habitación',
+            message: `¿Estás seguro de eliminar la habitación ${room.numero}? Esta acción la desactivará del sistema.`,
+            variant: 'danger',
+            confirmText: 'Eliminar',
+            loading: false,
+            onConfirm: async () => {
+                try {
+                    setConfirmDialog(prev => ({ ...prev, loading: true }));
+
+                    const response = await fetch(`/api/habitaciones/${room.id}`, {
+                        method: 'DELETE'
+                    });
+
+                    if (!response.ok) {
+                        const data = await response.json();
+                        throw new Error(data.error);
+                    }
+
+                    setSuccessMessage(`Habitación ${room.numero} eliminada`);
+                    router.refresh();
+                    fetchHabitaciones();
+                    setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+                } catch (err) {
+                    setError(err.message);
+                    setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+                }
+            }
+        });
+    };
+
     return (
         <div className="habitaciones-page">
             <div className="page-header">
@@ -67,12 +315,29 @@ function Habitaciones() {
                     <p className="page-subtitle">Administra el estado y disponibilidad de las habitaciones</p>
                 </div>
                 <div className="page-header-actions">
-                    <button className="btn btn-primary" onClick={() => setShowNewRoomModal(true)}>
+                    <button className="btn btn-secondary" onClick={fetchHabitaciones} disabled={loading}>
+                        <RefreshCw size={18} className={loading ? 'spinner' : ''} />
+                    </button>
+                    <button className="btn btn-primary" onClick={openCreateModal}>
                         <Plus size={18} />
                         Nueva Habitación
                     </button>
                 </div>
             </div>
+
+            {/* Messages */}
+            {error && (
+                <div className="alert alert-error mb-4">
+                    <AlertCircle size={20} />
+                    <span>{error}</span>
+                </div>
+            )}
+            {successMessage && (
+                <div className="alert alert-success mb-4">
+                    <Check size={20} />
+                    <span>{successMessage}</span>
+                </div>
+            )}
 
             {/* Quick Stats */}
             <div className="quick-stats">
@@ -155,16 +420,15 @@ function Habitaciones() {
             {viewMode === 'grid' && (
                 <div className="rooms-grid">
                     {filteredRooms.map((room) => {
-                        const huesped = room.huespedId ? getHuesped(room.huespedId) : null;
+                        const huesped = getHuespedForRoom(room.id);
                         return (
                             <div
                                 key={room.id}
                                 className={`room-card ${room.estado}`}
-                                onClick={() => setSelectedRoom(room)}
                             >
                                 <div className="room-card-header">
                                     <span className="room-number">{room.numero}</span>
-                                    <span className={`badge badge-${room.estado}`}>{room.estado}</span>
+                                    <span className={`badge badge-${getEstadoColor(room.estado)}`}>{room.estado}</span>
                                 </div>
                                 <div className="room-card-body">
                                     <div className="room-type-display">
@@ -178,24 +442,40 @@ function Habitaciones() {
                                         </div>
                                         <div className="room-detail">
                                             <DollarSign size={14} />
-                                            <span className="room-price">S/ {room.precioActual}</span>
+                                            <span className="room-price">S/ {room.precio_base}</span>
                                         </div>
                                     </div>
                                     {huesped && (
                                         <div className="room-guest">
-                                            <div className="avatar avatar-sm">{huesped.nombre.charAt(0)}</div>
-                                            <span className="guest-name">{huesped.nombre}</span>
+                                            <div className="avatar avatar-sm">{huesped.nombre?.charAt(0)}</div>
+                                            <span className="guest-name">{huesped.nombre} {huesped.apellidos || ''}</span>
                                         </div>
                                     )}
                                 </div>
                                 <div className="room-card-footer">
                                     <span className="room-floor">Piso {room.piso}</span>
                                     <div className="room-actions">
-                                        <button className="btn btn-ghost btn-icon" title="Ver detalles">
-                                            <Eye size={16} />
-                                        </button>
-                                        <button className="btn btn-ghost btn-icon" title="Editar">
+                                        <button
+                                            className="btn btn-ghost btn-icon"
+                                            title="Editar"
+                                            onClick={() => openEditModal(room)}
+                                        >
                                             <Edit size={16} />
+                                        </button>
+                                        <button
+                                            className="btn btn-ghost btn-icon"
+                                            title={room.estado === 'mantenimiento' ? 'Quitar mantenimiento' : 'Mantenimiento'}
+                                            onClick={() => handleSetMantenimiento(room)}
+                                        >
+                                            <Wrench size={16} />
+                                        </button>
+                                        <button
+                                            className="btn btn-ghost btn-icon text-danger"
+                                            title="Eliminar"
+                                            onClick={() => handleDelete(room)}
+                                            disabled={room.estado === 'ocupada'}
+                                        >
+                                            <Trash2 size={16} />
                                         </button>
                                     </div>
                                 </div>
@@ -212,54 +492,56 @@ function Habitaciones() {
                         <table className="table">
                             <thead>
                                 <tr>
-                                    <th>Habitación</th>
+                                    <th>Número</th>
                                     <th>Tipo</th>
-                                    <th>Capacidad</th>
                                     <th>Piso</th>
-                                    <th>Estado</th>
+                                    <th>Capacidad</th>
                                     <th>Precio</th>
+                                    <th>Estado</th>
                                     <th>Huésped</th>
                                     <th>Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {filteredRooms.map((room) => {
-                                    const huesped = room.huespedId ? getHuesped(room.huespedId) : null;
+                                    const huesped = getHuespedForRoom(room.id);
                                     return (
                                         <tr key={room.id}>
+                                            <td><strong>{room.numero}</strong></td>
                                             <td>
-                                                <div className="room-number-cell">
-                                                    <BedDouble size={18} />
-                                                    <span className="room-number-text">{room.numero}</span>
-                                                </div>
+                                                <span className="room-type-inline">
+                                                    {getTipoIcon(room.tipo)}
+                                                    {room.tipo}
+                                                </span>
                                             </td>
-                                            <td className="capitalize">{room.tipo}</td>
-                                            <td>{room.capacidad} personas</td>
-                                            <td>Piso {room.piso}</td>
+                                            <td>{room.piso}</td>
+                                            <td>{room.capacidad}</td>
+                                            <td>S/ {room.precio_base}</td>
                                             <td>
-                                                <span className={`badge badge-${room.estado}`}>{room.estado}</span>
+                                                <span className={`badge badge-${getEstadoColor(room.estado)}`}>
+                                                    {room.estado}
+                                                </span>
                                             </td>
-                                            <td className="room-price-cell">S/ {room.precioActual}</td>
                                             <td>
                                                 {huesped ? (
-                                                    <div className="guest-cell">
-                                                        <div className="avatar avatar-sm">{huesped.nombre.charAt(0)}</div>
-                                                        <span>{huesped.nombre}</span>
-                                                    </div>
+                                                    <span>{huesped.nombre} {huesped.apellidos || ''}</span>
                                                 ) : (
                                                     <span className="text-muted">-</span>
                                                 )}
                                             </td>
                                             <td>
                                                 <div className="table-actions">
-                                                    <button className="btn btn-ghost btn-sm" title="Ver">
-                                                        <Eye size={16} />
+                                                    <button
+                                                        className="btn btn-ghost btn-sm"
+                                                        onClick={() => openEditModal(room)}
+                                                    >
+                                                        <Edit size={14} />
                                                     </button>
-                                                    <button className="btn btn-ghost btn-sm" title="Editar">
-                                                        <Edit size={16} />
-                                                    </button>
-                                                    <button className="btn btn-ghost btn-sm text-danger" title="Eliminar">
-                                                        <Trash2 size={16} />
+                                                    <button
+                                                        className="btn btn-ghost btn-sm"
+                                                        onClick={() => handleSetMantenimiento(room)}
+                                                    >
+                                                        <Wrench size={14} />
                                                     </button>
                                                 </div>
                                             </td>
@@ -272,155 +554,151 @@ function Habitaciones() {
                 </div>
             )}
 
-            {/* Room Detail Modal */}
-            {selectedRoom && (
-                <div className="modal-overlay" onClick={() => setSelectedRoom(null)}>
+            {/* Modal Nueva/Editar Habitación */}
+            {(showNewRoomModal || showEditModal) && (
+                <div className="modal-overlay" onClick={() => { setShowNewRoomModal(false); setShowEditModal(false); }}>
                     <div className="modal" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h2 className="modal-title">Habitación {selectedRoom.numero}</h2>
-                            <button className="modal-close" onClick={() => setSelectedRoom(null)}>
+                            <h2 className="modal-title">
+                                {modalMode === 'create' ? 'Nueva Habitación' : `Editar Habitación ${formData.numero}`}
+                            </h2>
+                            <button className="modal-close" onClick={() => { setShowNewRoomModal(false); setShowEditModal(false); }}>
                                 <X size={24} />
                             </button>
                         </div>
-                        <div className="modal-body">
-                            <div className="room-detail-grid">
-                                <div className="detail-item">
-                                    <span className="detail-label">Tipo</span>
-                                    <span className="detail-value capitalize">{selectedRoom.tipo}</span>
-                                </div>
-                                <div className="detail-item">
-                                    <span className="detail-label">Capacidad</span>
-                                    <span className="detail-value">{selectedRoom.capacidad} personas</span>
-                                </div>
-                                <div className="detail-item">
-                                    <span className="detail-label">Piso</span>
-                                    <span className="detail-value">{selectedRoom.piso}</span>
-                                </div>
-                                <div className="detail-item">
-                                    <span className="detail-label">Estado</span>
-                                    <span className={`badge badge-${selectedRoom.estado}`}>{selectedRoom.estado}</span>
-                                </div>
-                                <div className="detail-item">
-                                    <span className="detail-label">Precio Base</span>
-                                    <span className="detail-value">S/ {selectedRoom.precioBase}</span>
-                                </div>
-                                <div className="detail-item">
-                                    <span className="detail-label">Precio Actual</span>
-                                    <span className="detail-value highlight">S/ {selectedRoom.precioActual}</span>
-                                </div>
-                            </div>
-                            {selectedRoom.huespedId && (
-                                <div className="current-guest-section">
-                                    <h4>Huésped Actual</h4>
-                                    <div className="guest-info-card">
-                                        {(() => {
-                                            const huesped = getHuesped(selectedRoom.huespedId);
-                                            return huesped ? (
-                                                <>
-                                                    <div className="avatar avatar-lg">{huesped.nombre.charAt(0)}</div>
-                                                    <div className="guest-details">
-                                                        <p className="guest-name-lg">{huesped.nombre}</p>
-                                                        <p className="guest-dni">DNI: {huesped.dni}</p>
-                                                        <p className="guest-dates">
-                                                            Check-in: {new Date(huesped.checkInDate).toLocaleDateString('es-PE')} |
-                                                            Check-out: {new Date(huesped.checkOutDate).toLocaleDateString('es-PE')}
-                                                        </p>
-                                                    </div>
-                                                </>
-                                            ) : null;
-                                        })()}
+                        <form onSubmit={handleSubmit}>
+                            <div className="modal-body">
+                                {formError && (
+                                    <div className="alert alert-error mb-4">
+                                        <AlertCircle size={18} />
+                                        <span>{formError}</span>
+                                    </div>
+                                )}
+
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label className="form-label">Número *</label>
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            name="numero"
+                                            value={formData.numero}
+                                            onChange={handleInputChange}
+                                            placeholder="Ej: 101"
+                                            required
+                                            disabled={modalMode === 'edit'}
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Piso</label>
+                                        <input
+                                            type="number"
+                                            className="form-input"
+                                            name="piso"
+                                            value={formData.piso}
+                                            onChange={handleInputChange}
+                                            min="1"
+                                            disabled={modalMode === 'edit'}
+                                        />
                                     </div>
                                 </div>
-                            )}
-                        </div>
-                        <div className="modal-footer">
-                            <button className="btn btn-secondary" onClick={() => setSelectedRoom(null)}>
-                                Cerrar
-                            </button>
-                            <button className="btn btn-primary">
-                                <Edit size={16} />
-                                Editar Habitación
-                            </button>
-                        </div>
+
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label className="form-label">Tipo *</label>
+                                        <select
+                                            className="form-select"
+                                            name="tipo"
+                                            value={formData.tipo}
+                                            onChange={handleInputChange}
+                                        >
+                                            <option value="simple">Simple</option>
+                                            <option value="doble">Doble</option>
+                                            <option value="matrimonial">Matrimonial</option>
+                                            <option value="suite">Suite</option>
+                                        </select>
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Capacidad</label>
+                                        <input
+                                            type="number"
+                                            className="form-input"
+                                            name="capacidad"
+                                            value={formData.capacidad}
+                                            onChange={handleInputChange}
+                                            min="1"
+                                            max="10"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="form-group">
+                                    <label className="form-label">Precio Base (S/) *</label>
+                                    <input
+                                        type="number"
+                                        className="form-input"
+                                        name="precio_base"
+                                        value={formData.precio_base}
+                                        onChange={handleInputChange}
+                                        step="0.01"
+                                        min="0"
+                                        placeholder="Ej: 80.00"
+                                        required
+                                    />
+                                </div>
+
+                                <div className="form-group">
+                                    <label className="form-label">Descripción</label>
+                                    <textarea
+                                        className="form-input"
+                                        name="descripcion"
+                                        value={formData.descripcion}
+                                        onChange={handleInputChange}
+                                        rows="2"
+                                        placeholder="Descripción de la habitación..."
+                                    />
+                                </div>
+                            </div>
+                            <div className="modal-footer">
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    onClick={() => { setShowNewRoomModal(false); setShowEditModal(false); }}
+                                >
+                                    Cancelar
+                                </button>
+                                <button type="submit" className="btn btn-primary" disabled={formLoading}>
+                                    {formLoading ? (
+                                        <>
+                                            <Loader2 size={16} className="spinner" />
+                                            {modalMode === 'create' ? 'Creando...' : 'Guardando...'}
+                                        </>
+                                    ) : (
+                                        <>
+                                            {modalMode === 'create' ? <Plus size={16} /> : <Save size={16} />}
+                                            {modalMode === 'create' ? 'Crear Habitación' : 'Guardar Cambios'}
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}
 
-            {/* New Room Modal */}
-            {showNewRoomModal && (
-                <div className="modal-overlay" onClick={() => setShowNewRoomModal(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2 className="modal-title">Nueva Habitación</h2>
-                            <button className="modal-close" onClick={() => setShowNewRoomModal(false)}>
-                                <X size={24} />
-                            </button>
-                        </div>
-                        <div className="modal-body">
-                            <form className="form-grid">
-                                <div className="form-group">
-                                    <label className="form-label">Número de Habitación</label>
-                                    <input type="text" className="form-input" placeholder="Ej: 101" />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Piso</label>
-                                    <select className="form-select">
-                                        <option value="">Seleccionar piso</option>
-                                        <option value="1">Piso 1</option>
-                                        <option value="2">Piso 2</option>
-                                        <option value="3">Piso 3</option>
-                                        <option value="4">Piso 4</option>
-                                        <option value="5">Piso 5</option>
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Tipo de Habitación</label>
-                                    <select className="form-select">
-                                        <option value="">Seleccionar tipo</option>
-                                        <option value="simple">Simple</option>
-                                        <option value="doble">Doble</option>
-                                        <option value="matrimonial">Matrimonial</option>
-                                        <option value="suite">Suite</option>
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Capacidad</label>
-                                    <select className="form-select">
-                                        <option value="">Seleccionar capacidad</option>
-                                        <option value="1">1 persona</option>
-                                        <option value="2">2 personas</option>
-                                        <option value="3">3 personas</option>
-                                        <option value="4">4 personas</option>
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Precio Base (S/)</label>
-                                    <input type="number" className="form-input" placeholder="Ej: 150" />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Estado Inicial</label>
-                                    <select className="form-select">
-                                        <option value="disponible">Disponible</option>
-                                        <option value="mantenimiento">En Mantenimiento</option>
-                                    </select>
-                                </div>
-                            </form>
-                        </div>
-                        <div className="modal-footer">
-                            <button className="btn btn-secondary" onClick={() => setShowNewRoomModal(false)}>
-                                Cancelar
-                            </button>
-                            <button className="btn btn-primary" onClick={() => setShowNewRoomModal(false)}>
-                                <Plus size={16} />
-                                Crear Habitación
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Confirm Dialog */}
+            <ConfirmDialog
+                isOpen={confirmDialog.isOpen}
+                onClose={() => !confirmDialog.loading && setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+                onConfirm={confirmDialog.onConfirm}
+                title={confirmDialog.title}
+                message={confirmDialog.message}
+                variant={confirmDialog.variant}
+                confirmText={confirmDialog.confirmText}
+                loading={confirmDialog.loading}
+            />
         </div>
     );
 }
 
 export default Habitaciones;
-

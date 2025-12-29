@@ -1,248 +1,521 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import {
+    Users,
     Search,
-    Filter,
-    User,
+    Plus,
+    Eye,
+    Edit,
+    X,
     Phone,
     Mail,
+    MapPin,
+    Globe,
+    Calendar,
+    DollarSign,
     Star,
+    Loader2,
+    AlertCircle,
+    Check,
+    RefreshCw,
+    Save,
+    BedDouble,
     Clock,
-    Eye,
-    History,
-    Edit,
-    X
+    Crown
 } from 'lucide-react';
-import { huespedes, habitaciones, historialEstadias } from '@/data/mockData';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import './Huespedes.css';
 
-function Huespedes() {
+function Huespedes({ initialHuespedes = [] }) {
+    const router = useRouter();
+    const [huespedes, setHuespedes] = useState(initialHuespedes);
     const [searchTerm, setSearchTerm] = useState('');
-    const [filterEstado, setFilterEstado] = useState('todos');
+    const [searchResults, setSearchResults] = useState([]);
+    const [searching, setSearching] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
+
+    // Selected guest for detail
     const [selectedHuesped, setSelectedHuesped] = useState(null);
+    const [huespedDetail, setHuespedDetail] = useState(null);
+    const [loadingDetail, setLoadingDetail] = useState(false);
 
-    const filteredHuespedes = huespedes.filter(h => {
-        const matchesSearch =
-            h.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            h.dni.includes(searchTerm);
-        const matchesEstado = filterEstado === 'todos' || h.estado === filterEstado;
-        return matchesSearch && matchesEstado;
-    });
+    // Edit modal
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [formData, setFormData] = useState({});
+    const [formLoading, setFormLoading] = useState(false);
 
-    const getHabitacion = (habitacionId) => {
-        return habitaciones.find(h => h.id === habitacionId);
+    // Clear messages
+    useEffect(() => {
+        if (successMessage) {
+            const timer = setTimeout(() => setSuccessMessage(''), 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [successMessage]);
+
+    // Debounced search
+    useEffect(() => {
+        const searchGuests = async () => {
+            if (searchTerm.length < 2) {
+                setSearchResults([]);
+                return;
+            }
+
+            try {
+                setSearching(true);
+                const response = await fetch(`/api/huespedes/search?q=${encodeURIComponent(searchTerm)}`);
+                const data = await response.json();
+                setSearchResults(data.huespedes || []);
+            } catch (err) {
+                console.error('Search error:', err);
+            } finally {
+                setSearching(false);
+            }
+        };
+
+        const timer = setTimeout(searchGuests, 300);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    const fetchHuespedes = async () => {
+        try {
+            setLoading(true);
+            const response = await fetch('/api/huespedes');
+            const data = await response.json();
+            if (data.huespedes) {
+                setHuespedes(data.huespedes);
+            }
+        } catch (err) {
+            setError('Error al cargar huéspedes');
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const getHistorial = (huespedId) => {
-        return historialEstadias.filter(h => h.huespedId === huespedId);
+    const loadHuespedDetail = async (huesped) => {
+        setSelectedHuesped(huesped);
+        setHuespedDetail(null);
+        setLoadingDetail(true);
+
+        try {
+            const response = await fetch(`/api/huespedes/${huesped.id}`);
+            const data = await response.json();
+            setHuespedDetail(data);
+        } catch (err) {
+            setError('Error al cargar detalles');
+        } finally {
+            setLoadingDetail(false);
+        }
     };
+
+    const openEditModal = () => {
+        if (!selectedHuesped) return;
+        setFormData({
+            nombre: selectedHuesped.nombre || '',
+            apellidos: selectedHuesped.apellidos || '',
+            telefono: selectedHuesped.telefono || '',
+            email: selectedHuesped.email || '',
+            procedencia: selectedHuesped.procedencia || '',
+            nacionalidad: selectedHuesped.nacionalidad || 'Perú',
+            es_frecuente: selectedHuesped.es_frecuente || false,
+            notas: selectedHuesped.notas || ''
+        });
+        setShowEditModal(true);
+    };
+
+    const handleInputChange = (e) => {
+        const { name, value, type, checked } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: type === 'checkbox' ? checked : value
+        }));
+    };
+
+    const handleSubmitEdit = async (e) => {
+        e.preventDefault();
+        setFormLoading(true);
+
+        try {
+            const response = await fetch(`/api/huespedes/${selectedHuesped.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error);
+
+            setSuccessMessage('Huésped actualizado');
+            setShowEditModal(false);
+            setSelectedHuesped({ ...selectedHuesped, ...formData });
+            router.refresh();
+            fetchHuespedes();
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setFormLoading(false);
+        }
+    };
+
+    const displayedGuests = searchTerm.length >= 2 ? searchResults : huespedes;
 
     return (
         <div className="huespedes-page">
             <div className="page-header">
                 <div>
                     <h1 className="page-title">Gestión de Huéspedes</h1>
-                    <p className="page-subtitle">Administra la información de los huéspedes</p>
+                    <p className="page-subtitle">CRM - Base de datos de clientes</p>
+                </div>
+                <div className="page-header-actions">
+                    <button className="btn btn-secondary" onClick={fetchHuespedes} disabled={loading}>
+                        <RefreshCw size={18} className={loading ? 'spinner' : ''} />
+                        Actualizar
+                    </button>
                 </div>
             </div>
 
-            {/* Quick Stats */}
-            <div className="quick-stats">
-                <div className="quick-stat">
-                    <span className="quick-stat-dot disponible"></span>
-                    <span className="quick-stat-value">{huespedes.filter(h => h.estado === 'dentro').length}</span>
-                    <span className="quick-stat-label">Dentro</span>
+            {/* Messages */}
+            {error && (
+                <div className="alert alert-error mb-4">
+                    <AlertCircle size={20} />
+                    <span>{error}</span>
+                    <button className="alert-close" onClick={() => setError('')}><X size={16} /></button>
                 </div>
-                <div className="quick-stat">
-                    <span className="quick-stat-dot" style={{ background: 'var(--info-500)' }}></span>
-                    <span className="quick-stat-value">{huespedes.filter(h => h.estado === 'fuera').length}</span>
-                    <span className="quick-stat-label">Fuera</span>
+            )}
+            {successMessage && (
+                <div className="alert alert-success mb-4">
+                    <Check size={20} />
+                    <span>{successMessage}</span>
                 </div>
-                <div className="quick-stat">
-                    <span className="quick-stat-dot limpieza"></span>
-                    <span className="quick-stat-value">{huespedes.filter(h => h.estado === 'esperando').length}</span>
-                    <span className="quick-stat-label">Esperando</span>
-                </div>
-                <div className="quick-stat">
-                    <span className="quick-stat-dot" style={{ background: 'var(--accent-gold)' }}></span>
-                    <span className="quick-stat-value">{huespedes.filter(h => h.esFrecuente).length}</span>
-                    <span className="quick-stat-label">Frecuentes</span>
-                </div>
-            </div>
+            )}
 
-            {/* Filter Bar */}
-            <div className="filter-bar">
-                <div className="search-input-wrapper" style={{ flex: 1, maxWidth: '400px' }}>
-                    <Search className="search-icon" size={18} />
+            {/* Search Bar */}
+            <div className="search-section">
+                <div className="search-input-wrapper search-lg">
+                    <Search className="search-icon" size={20} />
                     <input
                         type="text"
                         className="form-input"
-                        placeholder="Buscar por nombre o DNI..."
+                        placeholder="Buscar por DNI, nombre o apellidos..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
+                    {searching && <Loader2 size={18} className="search-spinner spinner" />}
+                </div>
+                <p className="search-hint">
+                    {searchTerm.length > 0 && searchTerm.length < 2
+                        ? 'Escribe al menos 2 caracteres para buscar'
+                        : `${displayedGuests.length} huéspedes encontrados`}
+                </p>
+            </div>
+
+            <div className="huespedes-content">
+                {/* Guests List */}
+                <div className="huespedes-list-panel">
+                    <div className="card">
+                        <div className="card-header">
+                            <h3 className="card-title">
+                                <Users size={20} />
+                                Lista de Huéspedes
+                            </h3>
+                        </div>
+                        {displayedGuests.length === 0 ? (
+                            <div className="empty-state">
+                                <Users size={48} style={{ opacity: 0.3 }} />
+                                <p>{searchTerm ? 'No se encontraron huéspedes' : 'No hay huéspedes registrados'}</p>
+                            </div>
+                        ) : (
+                            <div className="huespedes-list">
+                                {displayedGuests.map(huesped => (
+                                    <div
+                                        key={huesped.id}
+                                        className={`huesped-item ${selectedHuesped?.id === huesped.id ? 'selected' : ''}`}
+                                        onClick={() => loadHuespedDetail(huesped)}
+                                    >
+                                        <div className="huesped-avatar">
+                                            {huesped.nombre?.charAt(0)}
+                                            {huesped.es_frecuente && (
+                                                <span className="vip-badge" title="Huésped Frecuente">
+                                                    <Crown size={10} />
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="huesped-info">
+                                            <span className="huesped-nombre">
+                                                {huesped.nombre} {huesped.apellidos || ''}
+                                            </span>
+                                            <span className="huesped-documento">
+                                                {huesped.tipo_documento}: {huesped.numero_documento}
+                                            </span>
+                                        </div>
+                                        <div className="huesped-contact">
+                                            {huesped.telefono && (
+                                                <span><Phone size={12} /> {huesped.telefono}</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
-                <select
-                    className="form-select"
-                    value={filterEstado}
-                    onChange={(e) => setFilterEstado(e.target.value)}
-                >
-                    <option value="todos">Todos los estados</option>
-                    <option value="dentro">Dentro</option>
-                    <option value="fuera">Fuera</option>
-                    <option value="esperando">Esperando</option>
-                </select>
-            </div>
-
-            {/* Huespedes List */}
-            <div className="huespedes-grid">
-                {filteredHuespedes.map((huesped) => {
-                    const habitacion = getHabitacion(huesped.habitacionId);
-                    return (
-                        <div
-                            key={huesped.id}
-                            className="huesped-card"
-                            onClick={() => setSelectedHuesped(huesped)}
-                        >
-                            <div className="huesped-card-header">
-                                <div className="huesped-avatar">
-                                    {huesped.nombre.charAt(0)}
-                                    {huesped.esFrecuente && (
-                                        <span className="frecuente-badge" title="Cliente frecuente">
-                                            <Star size={12} fill="currentColor" />
-                                        </span>
-                                    )}
-                                </div>
-                                <div className="huesped-main-info">
-                                    <h3 className="huesped-nombre">{huesped.nombre}</h3>
-                                    <span className="huesped-dni">DNI: {huesped.dni}</span>
-                                </div>
-                                <span className={`badge badge-${huesped.estado}`}>
-                                    {huesped.estado}
-                                </span>
-                            </div>
-                            <div className="huesped-card-body">
-                                <div className="huesped-detail">
-                                    <Phone size={14} />
-                                    <span>{huesped.telefono}</span>
-                                </div>
-                                <div className="huesped-detail">
-                                    <Mail size={14} />
-                                    <span>{huesped.email}</span>
-                                </div>
-                                {habitacion && (
-                                    <div className="huesped-detail">
-                                        <Clock size={14} />
-                                        <span>Hab. {habitacion.numero} - {habitacion.tipo}</span>
-                                    </div>
-                                )}
-                            </div>
-                            <div className="huesped-card-footer">
-                                <span className="huesped-procedencia">{huesped.procedencia}</span>
-                                <button className="btn btn-ghost btn-sm">
-                                    <Eye size={16} />
-                                    Ver más
+                {/* Guest Detail */}
+                <div className="huesped-detail-panel">
+                    {selectedHuesped ? (
+                        <div className="card">
+                            <div className="card-header">
+                                <h3 className="card-title">Detalle del Huésped</h3>
+                                <button className="btn btn-ghost btn-icon" onClick={openEditModal}>
+                                    <Edit size={18} />
                                 </button>
                             </div>
+
+                            {loadingDetail ? (
+                                <div className="loading-state">
+                                    <Loader2 size={32} className="spinner" />
+                                    <p>Cargando historial...</p>
+                                </div>
+                            ) : huespedDetail ? (
+                                <div className="card-body">
+                                    {/* Guest Info */}
+                                    <div className="detail-header">
+                                        <div className="detail-avatar">
+                                            {selectedHuesped.nombre?.charAt(0)}
+                                            {(huespedDetail.resumen?.es_vip || selectedHuesped.es_frecuente) && (
+                                                <span className="vip-crown"><Crown size={16} /></span>
+                                            )}
+                                        </div>
+                                        <div className="detail-title">
+                                            <h2>{selectedHuesped.nombre} {selectedHuesped.apellidos || ''}</h2>
+                                            <span className="detail-doc">
+                                                {selectedHuesped.tipo_documento}: {selectedHuesped.numero_documento}
+                                            </span>
+                                            {(huespedDetail.resumen?.es_vip || selectedHuesped.es_frecuente) && (
+                                                <span className="badge badge-vip">
+                                                    <Star size={12} /> VIP
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Contact Info */}
+                                    <div className="detail-section">
+                                        <h4>Información de Contacto</h4>
+                                        <div className="detail-grid">
+                                            <div className="detail-item">
+                                                <Phone size={14} />
+                                                <span>{selectedHuesped.telefono || 'No registrado'}</span>
+                                            </div>
+                                            <div className="detail-item">
+                                                <Mail size={14} />
+                                                <span>{selectedHuesped.email || 'No registrado'}</span>
+                                            </div>
+                                            <div className="detail-item">
+                                                <MapPin size={14} />
+                                                <span>{selectedHuesped.procedencia || 'No registrado'}</span>
+                                            </div>
+                                            <div className="detail-item">
+                                                <Globe size={14} />
+                                                <span>{selectedHuesped.nacionalidad || 'Perú'}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Summary Stats */}
+                                    <div className="detail-section">
+                                        <h4>Resumen Histórico</h4>
+                                        <div className="stats-grid">
+                                            <div className="stat-box">
+                                                <BedDouble size={20} />
+                                                <div className="stat-value">{huespedDetail.resumen?.total_estadias || 0}</div>
+                                                <div className="stat-label">Estadías</div>
+                                            </div>
+                                            <div className="stat-box">
+                                                <Clock size={20} />
+                                                <div className="stat-value">{huespedDetail.resumen?.total_noches || 0}</div>
+                                                <div className="stat-label">Noches</div>
+                                            </div>
+                                            <div className="stat-box primary">
+                                                <DollarSign size={20} />
+                                                <div className="stat-value">S/ {(huespedDetail.resumen?.total_gastado || 0).toFixed(2)}</div>
+                                                <div className="stat-label">Total Gastado</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Stay History */}
+                                    <div className="detail-section">
+                                        <h4>Historial de Estadías</h4>
+                                        {huespedDetail.estadias?.length === 0 ? (
+                                            <p className="text-muted">Sin estadías registradas</p>
+                                        ) : (
+                                            <div className="history-list">
+                                                {huespedDetail.estadias?.map(estadia => (
+                                                    <div key={estadia.id} className="history-item">
+                                                        <div className="history-date">
+                                                            <Calendar size={14} />
+                                                            {new Date(estadia.fecha_checkin).toLocaleDateString('es-PE')}
+                                                        </div>
+                                                        <div className="history-room">
+                                                            <BedDouble size={14} />
+                                                            {estadia.habitacion?.numero} - {estadia.habitacion?.tipo}
+                                                        </div>
+                                                        <div className="history-nights">
+                                                            {estadia.noches} noches
+                                                        </div>
+                                                        <div className="history-total">
+                                                            S/ {(estadia.total || 0).toFixed(2)}
+                                                        </div>
+                                                        <span className={`badge badge-${estadia.estado === 'checkout' ? 'secondary' : 'success'}`}>
+                                                            {estadia.estado}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : null}
                         </div>
-                    );
-                })}
+                    ) : (
+                        <div className="card">
+                            <div className="empty-state">
+                                <Eye size={48} style={{ opacity: 0.3 }} />
+                                <p>Selecciona un huésped para ver sus detalles</p>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
 
-            {/* Modal de Detalle */}
-            {selectedHuesped && (
-                <div className="modal-overlay" onClick={() => setSelectedHuesped(null)}>
-                    <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
+            {/* Edit Modal */}
+            {showEditModal && (
+                <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h2 className="modal-title">Perfil del Huésped</h2>
-                            <button className="modal-close" onClick={() => setSelectedHuesped(null)}>
+                            <h2 className="modal-title">Editar Huésped</h2>
+                            <button className="modal-close" onClick={() => setShowEditModal(false)}>
                                 <X size={24} />
                             </button>
                         </div>
-                        <div className="modal-body">
-                            <div className="huesped-profile">
-                                <div className="profile-header">
-                                    <div className="profile-avatar">
-                                        {selectedHuesped.nombre.charAt(0)}
-                                        {selectedHuesped.esFrecuente && (
-                                            <span className="frecuente-badge-lg">
-                                                <Star size={16} fill="currentColor" />
-                                            </span>
-                                        )}
+                        <form onSubmit={handleSubmitEdit}>
+                            <div className="modal-body">
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label className="form-label">Nombres</label>
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            name="nombre"
+                                            value={formData.nombre}
+                                            onChange={handleInputChange}
+                                        />
                                     </div>
-                                    <div className="profile-info">
-                                        <h2>{selectedHuesped.nombre}</h2>
-                                        <p>DNI: {selectedHuesped.dni}</p>
-                                        <span className={`badge badge-${selectedHuesped.estado}`}>
-                                            {selectedHuesped.estado}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                <div className="profile-details-grid">
-                                    <div className="profile-detail">
-                                        <Phone size={16} />
-                                        <div>
-                                            <span className="detail-label">Teléfono</span>
-                                            <span className="detail-value">{selectedHuesped.telefono}</span>
-                                        </div>
-                                    </div>
-                                    <div className="profile-detail">
-                                        <Mail size={16} />
-                                        <div>
-                                            <span className="detail-label">Email</span>
-                                            <span className="detail-value">{selectedHuesped.email}</span>
-                                        </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Apellidos</label>
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            name="apellidos"
+                                            value={formData.apellidos}
+                                            onChange={handleInputChange}
+                                        />
                                     </div>
                                 </div>
 
-                                {selectedHuesped.notas && (
-                                    <div className="profile-notes">
-                                        <h4>Notas</h4>
-                                        <p>{selectedHuesped.notas}</p>
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label className="form-label">Teléfono</label>
+                                        <input
+                                            type="tel"
+                                            className="form-input"
+                                            name="telefono"
+                                            value={formData.telefono}
+                                            onChange={handleInputChange}
+                                        />
                                     </div>
-                                )}
+                                    <div className="form-group">
+                                        <label className="form-label">Email</label>
+                                        <input
+                                            type="email"
+                                            className="form-input"
+                                            name="email"
+                                            value={formData.email}
+                                            onChange={handleInputChange}
+                                        />
+                                    </div>
+                                </div>
 
-                                <div className="profile-historial">
-                                    <h4>
-                                        <History size={16} />
-                                        Historial de Estadías
-                                    </h4>
-                                    <div className="historial-list">
-                                        {getHistorial(selectedHuesped.id).length > 0 ? (
-                                            getHistorial(selectedHuesped.id).map((estadia) => {
-                                                const hab = getHabitacion(estadia.habitacionId);
-                                                return (
-                                                    <div key={estadia.id} className="historial-item">
-                                                        <div className="historial-info">
-                                                            <span className="historial-hab">Hab. {hab?.numero}</span>
-                                                            <span className="historial-fechas">
-                                                                {new Date(estadia.fechaInicio).toLocaleDateString('es-PE')} -
-                                                                {new Date(estadia.fechaFin).toLocaleDateString('es-PE')}
-                                                            </span>
-                                                        </div>
-                                                        <span className="historial-total">S/ {estadia.total}</span>
-                                                    </div>
-                                                );
-                                            })
-                                        ) : (
-                                            <p className="no-historial">Primera estadía</p>
-                                        )}
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label className="form-label">Procedencia</label>
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            name="procedencia"
+                                            value={formData.procedencia}
+                                            onChange={handleInputChange}
+                                        />
                                     </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Nacionalidad</label>
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            name="nacionalidad"
+                                            value={formData.nacionalidad}
+                                            onChange={handleInputChange}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="form-group">
+                                    <label className="form-label">Notas</label>
+                                    <textarea
+                                        className="form-input"
+                                        name="notas"
+                                        value={formData.notas}
+                                        onChange={handleInputChange}
+                                        rows="2"
+                                    />
+                                </div>
+
+                                <div className="form-group">
+                                    <label className="checkbox-label">
+                                        <input
+                                            type="checkbox"
+                                            name="es_frecuente"
+                                            checked={formData.es_frecuente}
+                                            onChange={handleInputChange}
+                                        />
+                                        <Star size={16} />
+                                        Marcar como huésped frecuente (VIP)
+                                    </label>
                                 </div>
                             </div>
-                        </div>
-                        <div className="modal-footer">
-                            <button className="btn btn-secondary" onClick={() => setSelectedHuesped(null)}>
-                                Cerrar
-                            </button>
-                            <button className="btn btn-primary">
-                                <Edit size={16} />
-                                Editar Perfil
-                            </button>
-                        </div>
+                            <div className="modal-footer">
+                                <button type="button" className="btn btn-secondary" onClick={() => setShowEditModal(false)}>
+                                    Cancelar
+                                </button>
+                                <button type="submit" className="btn btn-primary" disabled={formLoading}>
+                                    {formLoading ? (
+                                        <>
+                                            <Loader2 size={16} className="spinner" />
+                                            Guardando...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Save size={16} />
+                                            Guardar Cambios
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}
@@ -251,4 +524,3 @@ function Huespedes() {
 }
 
 export default Huespedes;
-

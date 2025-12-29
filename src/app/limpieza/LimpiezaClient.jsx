@@ -1,264 +1,325 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
     Sparkles,
-    Wrench,
-    CheckCircle2,
-    Clock,
-    AlertTriangle,
-    Plus,
-    User,
     BedDouble,
-    Calendar,
-    Check
+    Check,
+    Clock,
+    AlertCircle,
+    RefreshCw,
+    Loader2,
+    CheckCircle,
+    XCircle
 } from 'lucide-react';
-import { habitaciones, ordenesLimpieza } from '@/data/mockData';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import './Limpieza.css';
 
-function Limpieza() {
-    const [activeTab, setActiveTab] = useState('limpieza');
+function Limpieza({ initialOrdenes = [], initialHabitacionesLimpieza = [] }) {
+    const router = useRouter();
+    const [ordenes, setOrdenes] = useState(initialOrdenes);
+    const [habitacionesLimpieza, setHabitacionesLimpieza] = useState(initialHabitacionesLimpieza);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
+    const [filterEstado, setFilterEstado] = useState('pendiente');
 
-    const habitacionesLimpieza = habitaciones.filter(h => h.estado === 'limpieza');
-    const habitacionesMantenimiento = habitaciones.filter(h => h.estado === 'mantenimiento');
+    // Confirm dialog
+    const [confirmDialog, setConfirmDialog] = useState({
+        isOpen: false,
+        title: '',
+        message: '',
+        variant: 'success',
+        onConfirm: () => { },
+        loading: false
+    });
+
+    useEffect(() => {
+        if (successMessage) {
+            const timer = setTimeout(() => setSuccessMessage(''), 4000);
+            return () => clearTimeout(timer);
+        }
+    }, [successMessage]);
+
+    const fetchData = async () => {
+        try {
+            setLoading(true);
+            const [ordenesRes, habRes] = await Promise.all([
+                fetch('/api/limpieza'),
+                fetch('/api/habitaciones?estado=limpieza')
+            ]);
+
+            const ordenesData = await ordenesRes.json();
+            const habData = await habRes.json();
+
+            if (ordenesData.ordenes) setOrdenes(ordenesData.ordenes);
+            if (habData.habitaciones) setHabitacionesLimpieza(habData.habitaciones);
+        } catch (err) {
+            setError('Error al cargar datos');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const filteredOrdenes = ordenes.filter(o => {
+        if (filterEstado === 'todas') return true;
+        return o.estado === filterEstado;
+    });
+
+    const pendingCount = ordenes.filter(o => o.estado === 'pendiente').length;
+    const completedCount = ordenes.filter(o => o.estado === 'completada').length;
+
+    const handleCompleteLimpieza = (orden) => {
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Completar Limpieza',
+            message: `¿Confirmar que la habitación ${orden.habitacion?.numero} está limpia? La habitación pasará a estado "Disponible".`,
+            variant: 'success',
+            confirmText: 'Marcar Limpia',
+            loading: false,
+            onConfirm: async () => {
+                try {
+                    setConfirmDialog(prev => ({ ...prev, loading: true }));
+
+                    const response = await fetch(`/api/limpieza/${orden.id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ estado: 'completada' })
+                    });
+
+                    const data = await response.json();
+                    if (!response.ok) throw new Error(data.error);
+
+                    setSuccessMessage(data.message || 'Limpieza completada');
+                    setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+                    router.refresh();
+                    fetchData();
+                } catch (err) {
+                    setError(err.message);
+                    setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+                }
+            }
+        });
+    };
+
+    const handleQuickClean = (habitacion) => {
+        // Quick clean for rooms without order
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Limpieza Rápida',
+            message: `¿Marcar habitación ${habitacion.numero} como limpia y disponible?`,
+            variant: 'success',
+            confirmText: 'Marcar Disponible',
+            loading: false,
+            onConfirm: async () => {
+                try {
+                    setConfirmDialog(prev => ({ ...prev, loading: true }));
+
+                    const response = await fetch(`/api/habitaciones/${habitacion.id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ estado: 'disponible' })
+                    });
+
+                    if (!response.ok) throw new Error('Error al actualizar');
+
+                    setSuccessMessage(`Habitación ${habitacion.numero} ahora disponible`);
+                    setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+                    router.refresh();
+                    fetchData();
+                } catch (err) {
+                    setError(err.message);
+                    setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+                }
+            }
+        });
+    };
+
+    const getPrioridadColor = (prioridad) => {
+        switch (prioridad) {
+            case 'alta': return 'danger';
+            case 'normal': return 'warning';
+            case 'baja': return 'secondary';
+            default: return 'secondary';
+        }
+    };
+
+    const getEstadoIcon = (estado) => {
+        switch (estado) {
+            case 'completada': return <CheckCircle size={16} className="text-success" />;
+            case 'cancelada': return <XCircle size={16} className="text-danger" />;
+            default: return <Clock size={16} className="text-warning" />;
+        }
+    };
 
     return (
         <div className="limpieza-page">
             <div className="page-header">
                 <div>
-                    <h1 className="page-title">Limpieza y Mantenimiento</h1>
-                    <p className="page-subtitle">Gestiona el estado de limpieza y órdenes de mantenimiento</p>
+                    <h1 className="page-title">Gestión de Limpieza</h1>
+                    <p className="page-subtitle">Administra las órdenes de limpieza y estado de habitaciones</p>
                 </div>
                 <div className="page-header-actions">
-                    <button className="btn btn-primary">
-                        <Plus size={18} />
-                        Nueva Orden
+                    <button className="btn btn-secondary" onClick={fetchData} disabled={loading}>
+                        <RefreshCw size={18} className={loading ? 'spinner' : ''} />
+                        Actualizar
                     </button>
                 </div>
             </div>
 
+            {/* Messages */}
+            {error && (
+                <div className="alert alert-error mb-4">
+                    <AlertCircle size={20} />
+                    <span>{error}</span>
+                </div>
+            )}
+            {successMessage && (
+                <div className="alert alert-success mb-4">
+                    <Check size={20} />
+                    <span>{successMessage}</span>
+                </div>
+            )}
+
             {/* Stats */}
-            <div className="grid grid-cols-4 mb-6">
-                <div className="stat-card gold">
+            <div className="limpieza-stats">
+                <div className="stat-card warning">
                     <div className="stat-card-icon">
-                        <Sparkles size={24} />
+                        <BedDouble size={24} />
                     </div>
                     <div className="stat-value">{habitacionesLimpieza.length}</div>
                     <div className="stat-label">En Limpieza</div>
-                </div>
-                <div className="stat-card purple">
-                    <div className="stat-card-icon">
-                        <Wrench size={24} />
-                    </div>
-                    <div className="stat-value">{habitacionesMantenimiento.length}</div>
-                    <div className="stat-label">En Mantenimiento</div>
-                </div>
-                <div className="stat-card success">
-                    <div className="stat-card-icon">
-                        <CheckCircle2 size={24} />
-                    </div>
-                    <div className="stat-value">{habitaciones.filter(h => h.estado === 'disponible').length}</div>
-                    <div className="stat-label">Listas</div>
                 </div>
                 <div className="stat-card danger">
                     <div className="stat-card-icon">
                         <Clock size={24} />
                     </div>
-                    <div className="stat-value">{ordenesLimpieza.filter(o => o.estado === 'pendiente').length}</div>
+                    <div className="stat-value">{pendingCount}</div>
                     <div className="stat-label">Órdenes Pendientes</div>
                 </div>
-            </div>
-
-            {/* Tabs */}
-            <div className="tabs">
-                <button
-                    className={`tab ${activeTab === 'limpieza' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('limpieza')}
-                >
-                    <Sparkles size={16} />
-                    Limpieza
-                </button>
-                <button
-                    className={`tab ${activeTab === 'mantenimiento' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('mantenimiento')}
-                >
-                    <Wrench size={16} />
-                    Mantenimiento
-                </button>
-                <button
-                    className={`tab ${activeTab === 'ordenes' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('ordenes')}
-                >
-                    <Clock size={16} />
-                    Órdenes Activas
-                </button>
-            </div>
-
-            {/* Limpieza Tab */}
-            {activeTab === 'limpieza' && (
-                <div className="rooms-status-grid">
-                    <div className="card status-section">
-                        <h3 className="section-title">
-                            <span className="status-indicator limpieza"></span>
-                            En Limpieza
-                        </h3>
-                        <div className="status-rooms">
-                            {habitacionesLimpieza.length > 0 ? (
-                                habitacionesLimpieza.map((hab) => (
-                                    <div key={hab.id} className="status-room-card limpieza">
-                                        <div className="room-header">
-                                            <span className="room-number">{hab.numero}</span>
-                                            <span className="room-type">{hab.tipo}</span>
-                                        </div>
-                                        <div className="room-floor">Piso {hab.piso}</div>
-                                        <button className="btn btn-success btn-sm w-full">
-                                            <Check size={14} />
-                                            Marcar Limpia
-                                        </button>
-                                    </div>
-                                ))
-                            ) : (
-                                <p className="no-rooms">No hay habitaciones en limpieza</p>
-                            )}
-                        </div>
+                <div className="stat-card success">
+                    <div className="stat-card-icon">
+                        <CheckCircle size={24} />
                     </div>
-
-                    <div className="card status-section">
-                        <h3 className="section-title">
-                            <span className="status-indicator disponible"></span>
-                            Listas para Ocupar
-                        </h3>
-                        <div className="status-rooms">
-                            {habitaciones.filter(h => h.estado === 'disponible').map((hab) => (
-                                <div key={hab.id} className="status-room-card disponible">
-                                    <div className="room-header">
-                                        <span className="room-number">{hab.numero}</span>
-                                        <span className="room-type">{hab.tipo}</span>
-                                    </div>
-                                    <div className="room-floor">Piso {hab.piso}</div>
-                                    <span className="badge badge-disponible">Disponible</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                    <div className="stat-value">{completedCount}</div>
+                    <div className="stat-label">Completadas Hoy</div>
                 </div>
-            )}
+            </div>
 
-            {/* Mantenimiento Tab */}
-            {activeTab === 'mantenimiento' && (
-                <div className="card">
-                    <div className="card-header">
-                        <div>
-                            <h3 className="card-title">Habitaciones en Mantenimiento</h3>
-                            <p className="card-subtitle">Requieren reparación o inspección</p>
+            <div className="limpieza-content">
+                {/* Habitaciones en Limpieza */}
+                <div className="limpieza-panel">
+                    <div className="card">
+                        <div className="card-header">
+                            <h3 className="card-title">
+                                <Sparkles size={20} />
+                                Habitaciones en Limpieza
+                            </h3>
                         </div>
-                    </div>
-                    <div className="mantenimiento-list">
-                        {habitacionesMantenimiento.length > 0 ? (
-                            habitacionesMantenimiento.map((hab) => {
-                                const orden = ordenesLimpieza.find(
-                                    o => o.habitacionId === hab.id && o.tipo === 'mantenimiento'
-                                );
-                                return (
-                                    <div key={hab.id} className="mantenimiento-item">
-                                        <div className="mantenimiento-room">
-                                            <BedDouble size={20} />
-                                            <div>
-                                                <span className="room-num">Habitación {hab.numero}</span>
-                                                <span className="room-tipo">{hab.tipo} - Piso {hab.piso}</span>
-                                            </div>
-                                        </div>
-                                        <div className="mantenimiento-issue">
-                                            <AlertTriangle size={16} />
-                                            <span>{orden?.notas || 'Sin descripción'}</span>
-                                        </div>
-                                        <div className="mantenimiento-assigned">
-                                            <User size={16} />
-                                            <span>{orden?.asignadoA || 'Sin asignar'}</span>
-                                        </div>
-                                        <span className={`badge badge-${orden?.estado || 'pendiente'}`}>
-                                            {orden?.estado || 'pendiente'}
-                                        </span>
-                                        <button className="btn btn-primary btn-sm">
-                                            Completar
-                                        </button>
-                                    </div>
-                                );
-                            })
+                        {habitacionesLimpieza.length === 0 ? (
+                            <div className="empty-state-sm">
+                                <CheckCircle size={32} style={{ opacity: 0.3 }} />
+                                <p>Todas las habitaciones están limpias</p>
+                            </div>
                         ) : (
-                            <div className="empty-state">
-                                <CheckCircle2 size={48} />
-                                <h4>¡Todo en orden!</h4>
-                                <p>No hay habitaciones en mantenimiento</p>
+                            <div className="habitaciones-limpieza-grid">
+                                {habitacionesLimpieza.map(hab => {
+                                    const orden = ordenes.find(o =>
+                                        o.habitacion_id === hab.id && o.estado === 'pendiente'
+                                    );
+                                    return (
+                                        <div key={hab.id} className="hab-limpieza-card">
+                                            <div className="hab-number">{hab.numero}</div>
+                                            <div className="hab-tipo">{hab.tipo}</div>
+                                            <div className="hab-piso">Piso {hab.piso}</div>
+                                            {orden && (
+                                                <span className={`badge badge-${getPrioridadColor(orden.prioridad)}`}>
+                                                    {orden.prioridad}
+                                                </span>
+                                            )}
+                                            <button
+                                                className="btn btn-success btn-sm btn-block"
+                                                onClick={() => orden ? handleCompleteLimpieza(orden) : handleQuickClean(hab)}
+                                            >
+                                                <Check size={16} />
+                                                Marcar Limpia
+                                            </button>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
                 </div>
-            )}
 
-            {/* Órdenes Tab */}
-            {activeTab === 'ordenes' && (
-                <div className="card">
-                    <div className="card-header">
-                        <div>
-                            <h3 className="card-title">Órdenes Activas</h3>
-                            <p className="card-subtitle">Tareas de limpieza y mantenimiento</p>
+                {/* Órdenes de Limpieza */}
+                <div className="ordenes-panel">
+                    <div className="card">
+                        <div className="card-header">
+                            <h3 className="card-title">Órdenes de Servicio</h3>
+                            <select
+                                className="form-select form-select-sm"
+                                value={filterEstado}
+                                onChange={(e) => setFilterEstado(e.target.value)}
+                            >
+                                <option value="pendiente">Pendientes</option>
+                                <option value="completada">Completadas</option>
+                                <option value="todas">Todas</option>
+                            </select>
                         </div>
-                    </div>
-                    <div className="table-container">
-                        <table className="table">
-                            <thead>
-                                <tr>
-                                    <th>Habitación</th>
-                                    <th>Tipo</th>
-                                    <th>Asignado a</th>
-                                    <th>Fecha</th>
-                                    <th>Notas</th>
-                                    <th>Estado</th>
-                                    <th>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {ordenesLimpieza.map((orden) => {
-                                    const hab = habitaciones.find(h => h.id === orden.habitacionId);
-                                    return (
-                                        <tr key={orden.id}>
-                                            <td>
-                                                <div className="orden-habitacion">
-                                                    <BedDouble size={16} />
-                                                    <span>{hab?.numero}</span>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <span className={`badge badge-${orden.tipo === 'limpieza' ? 'limpieza' : 'mantenimiento'}`}>
-                                                    {orden.tipo}
-                                                </span>
-                                            </td>
-                                            <td>{orden.asignadoA}</td>
-                                            <td>{new Date(orden.fecha).toLocaleDateString('es-PE')}</td>
-                                            <td className="notas-cell">{orden.notas}</td>
-                                            <td>
-                                                <span className={`badge badge-${orden.estado === 'en_proceso' ? 'limpieza' : 'pendiente'}`}>
-                                                    {orden.estado.replace('_', ' ')}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <button className="btn btn-success btn-sm">
-                                                    <Check size={14} />
-                                                    Completar
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
+                        {filteredOrdenes.length === 0 ? (
+                            <div className="empty-state-sm">
+                                <Clock size={32} style={{ opacity: 0.3 }} />
+                                <p>No hay órdenes {filterEstado !== 'todas' ? filterEstado + 's' : ''}</p>
+                            </div>
+                        ) : (
+                            <div className="ordenes-list">
+                                {filteredOrdenes.map(orden => (
+                                    <div key={orden.id} className={`orden-item ${orden.estado}`}>
+                                        <div className="orden-hab">
+                                            <BedDouble size={16} />
+                                            <span>{orden.habitacion?.numero}</span>
+                                        </div>
+                                        <div className="orden-tipo">
+                                            {orden.tipo_servicio.replace('_', ' ')}
+                                        </div>
+                                        <span className={`badge badge-${getPrioridadColor(orden.prioridad)}`}>
+                                            {orden.prioridad}
+                                        </span>
+                                        <div className="orden-estado">
+                                            {getEstadoIcon(orden.estado)}
+                                            <span>{orden.estado}</span>
+                                        </div>
+                                        {orden.estado === 'pendiente' && (
+                                            <button
+                                                className="btn btn-success btn-sm"
+                                                onClick={() => handleCompleteLimpieza(orden)}
+                                            >
+                                                <Check size={14} />
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
-            )}
+            </div>
+
+            {/* Confirm Dialog */}
+            <ConfirmDialog
+                isOpen={confirmDialog.isOpen}
+                onClose={() => !confirmDialog.loading && setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+                onConfirm={confirmDialog.onConfirm}
+                title={confirmDialog.title}
+                message={confirmDialog.message}
+                variant={confirmDialog.variant}
+                confirmText={confirmDialog.confirmText}
+                loading={confirmDialog.loading}
+            />
         </div>
     );
 }
 
 export default Limpieza;
-

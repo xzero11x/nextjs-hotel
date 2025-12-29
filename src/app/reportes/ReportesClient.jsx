@@ -1,17 +1,24 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     BarChart3,
     TrendingUp,
     Download,
     Calendar,
-    FileSpreadsheet,
-    FileText,
     DollarSign,
     BedDouble,
     Users,
-    Percent
+    Percent,
+    Loader2,
+    RefreshCw,
+    Banknote,
+    Smartphone,
+    CreditCard,
+    Building2,
+    Globe,
+    MapPin,
+    Crown
 } from 'lucide-react';
 import {
     AreaChart,
@@ -25,334 +32,370 @@ import {
     Bar,
     PieChart,
     Pie,
-    Cell,
-    LineChart,
-    Line
+    Cell
 } from 'recharts';
-import { ocupacionSemanal, ingresosMensuales, habitaciones } from '@/data/mockData';
-import InfoTooltip from '@/components/ui/InfoTooltip';
 import './Reportes.css';
 
+const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+
 function Reportes() {
-    const [selectedPeriod, setSelectedPeriod] = useState('mes');
+    const [activeTab, setActiveTab] = useState('ocupacion');
+    const [periodo, setPeriodo] = useState(30);
+    const [loading, setLoading] = useState(true);
 
-    const ocupacionPorTipo = [
-        { name: 'Simple', ocupacion: 75, ingresos: 3500 },
-        { name: 'Doble', ocupacion: 82, ingresos: 5200 },
-        { name: 'Matrimonial', ocupacion: 68, ingresos: 4800 },
-        { name: 'Suite', ocupacion: 45, ingresos: 6500 },
-    ];
+    const [ocupacionData, setOcupacionData] = useState(null);
+    const [ingresosData, setIngresosData] = useState(null);
+    const [huespedesData, setHuespedesData] = useState(null);
 
-    const COLORS = ['#0ea5e9', '#22c55e', '#f59e0b', '#a855f7'];
+    useEffect(() => {
+        fetchReports();
+    }, [periodo]);
+
+    const fetchReports = async () => {
+        setLoading(true);
+        try {
+            const [ocupacion, ingresos, huespedes] = await Promise.all([
+                fetch(`/api/reportes/ocupacion?dias=${periodo}`).then(r => r.json()),
+                fetch(`/api/reportes/ingresos?dias=${periodo}`).then(r => r.json()),
+                fetch(`/api/reportes/huespedes?dias=${periodo}`).then(r => r.json())
+            ]);
+
+            setOcupacionData(ocupacion);
+            setIngresosData(ingresos);
+            setHuespedesData(huespedes);
+        } catch (error) {
+            console.error('Error fetching reports:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const getMetodoIcon = (metodo) => {
+        switch (metodo) {
+            case 'efectivo': return <Banknote size={14} />;
+            case 'yape': case 'plin': return <Smartphone size={14} />;
+            case 'tarjeta': return <CreditCard size={14} />;
+            default: return <Building2 size={14} />;
+        }
+    };
+
+    const metodosPieData = ingresosData?.por_metodo
+        ? Object.entries(ingresosData.por_metodo)
+            .filter(([_, v]) => v > 0)
+            .map(([name, value]) => ({ name, value }))
+        : [];
 
     return (
         <div className="reportes-page">
             <div className="page-header">
                 <div>
                     <h1 className="page-title">Reportes y Estadísticas</h1>
-                    <p className="page-subtitle">Análisis detallado del rendimiento del hotel</p>
+                    <p className="page-subtitle">Análisis de rendimiento del hotel</p>
                 </div>
                 <div className="page-header-actions">
                     <select
                         className="form-select"
-                        value={selectedPeriod}
-                        onChange={(e) => setSelectedPeriod(e.target.value)}
+                        value={periodo}
+                        onChange={(e) => setPeriodo(parseInt(e.target.value))}
                     >
-                        <option value="semana">Esta semana</option>
-                        <option value="mes">Este mes</option>
-                        <option value="trimestre">Este trimestre</option>
-                        <option value="año">Este año</option>
+                        <option value={7}>Últimos 7 días</option>
+                        <option value={14}>Últimos 14 días</option>
+                        <option value={30}>Últimos 30 días</option>
+                        <option value={90}>Últimos 90 días</option>
                     </select>
-                    <button className="btn btn-secondary">
-                        <FileSpreadsheet size={18} />
-                        Exportar Excel
-                    </button>
-                    <button className="btn btn-primary">
-                        <FileText size={18} />
-                        Exportar PDF
+                    <button className="btn btn-secondary" onClick={fetchReports} disabled={loading}>
+                        <RefreshCw size={18} className={loading ? 'spinner' : ''} />
                     </button>
                 </div>
             </div>
 
-            {/* KPIs */}
-            <div className="grid grid-cols-4 mb-6">
-                <div className="stat-card primary">
-                    <div className="stat-card-header">
-                        <div className="stat-card-icon">
-                            <Percent size={24} />
-                        </div>
-                        <InfoTooltip text="Porcentaje promedio de habitaciones ocupadas durante el período seleccionado" />
-                    </div>
-                    <div className="stat-value">72%</div>
-                    <div className="stat-label">Ocupación Promedio</div>
-                    <div className="stat-change positive">
-                        <TrendingUp size={14} />
-                        <span>+5% vs mes anterior</span>
-                    </div>
+            {loading ? (
+                <div className="loading-state">
+                    <Loader2 size={48} className="spinner" />
+                    <p>Generando reportes...</p>
                 </div>
-                <div className="stat-card gold">
-                    <div className="stat-card-header">
-                        <div className="stat-card-icon">
-                            <DollarSign size={24} />
-                        </div>
-                        <InfoTooltip text="Total de ingresos generados en el mes actual por todas las habitaciones y servicios" />
+            ) : (
+                <>
+                    {/* Tabs */}
+                    <div className="tabs mb-4">
+                        <button
+                            className={`tab ${activeTab === 'ocupacion' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('ocupacion')}
+                        >
+                            <BedDouble size={18} />
+                            Ocupación
+                        </button>
+                        <button
+                            className={`tab ${activeTab === 'ingresos' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('ingresos')}
+                        >
+                            <DollarSign size={18} />
+                            Ingresos
+                        </button>
+                        <button
+                            className={`tab ${activeTab === 'huespedes' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('huespedes')}
+                        >
+                            <Users size={18} />
+                            Huéspedes
+                        </button>
                     </div>
-                    <div className="stat-value">S/ 12,450</div>
-                    <div className="stat-label">Ingresos del Mes</div>
-                    <div className="stat-change positive">
-                        <TrendingUp size={14} />
-                        <span>+8% vs mes anterior</span>
-                    </div>
-                </div>
-                <div className="stat-card success">
-                    <div className="stat-card-header">
-                        <div className="stat-card-icon">
-                            <Users size={24} />
-                        </div>
-                        <InfoTooltip text="Número total de huéspedes que se han alojado en el hotel durante el mes" />
-                    </div>
-                    <div className="stat-value">156</div>
-                    <div className="stat-label">Huéspedes del Mes</div>
-                    <div className="stat-change positive">
-                        <TrendingUp size={14} />
-                        <span>+12% vs mes anterior</span>
-                    </div>
-                </div>
-                <div className="stat-card purple">
-                    <div className="stat-card-header">
-                        <div className="stat-card-icon">
-                            <BedDouble size={24} />
-                        </div>
-                        <InfoTooltip text="Precio promedio por noche cobrado a los huéspedes durante el período (ADR - Average Daily Rate)" />
-                    </div>
-                    <div className="stat-value">S/ 85</div>
-                    <div className="stat-label">Tarifa Promedio</div>
-                    <div className="stat-change positive">
-                        <TrendingUp size={14} />
-                        <span>+3% vs mes anterior</span>
-                    </div>
-                </div>
-            </div>
 
-            {/* Charts Row 1 */}
-            <div className="grid grid-cols-2 mb-6">
-                <div className="card chart-card">
-                    <div className="card-header">
-                        <div>
-                            <h3 className="card-title">Ingresos Mensuales</h3>
-                            <p className="card-subtitle">Tendencia de ingresos por mes</p>
-                        </div>
-                    </div>
-                    <div className="chart-container">
-                        <ResponsiveContainer width="100%" height={300}>
-                            <AreaChart data={ingresosMensuales}>
-                                <defs>
-                                    <linearGradient id="colorIngresos" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" />
-                                <XAxis dataKey="mes" stroke="#64748b" fontSize={12} />
-                                <YAxis stroke="#64748b" fontSize={12} tickFormatter={(v) => `S/${v / 1000}k`} />
-                                <Tooltip
-                                    contentStyle={{
-                                        background: '#1e293b',
-                                        border: '1px solid rgba(255,255,255,0.1)',
-                                        borderRadius: '8px',
-                                        color: '#f8fafc'
-                                    }}
-                                    formatter={(value) => [`S/ ${value.toLocaleString()}`, 'Ingresos']}
-                                />
-                                <Area
-                                    type="monotone"
-                                    dataKey="ingresos"
-                                    stroke="#f59e0b"
-                                    strokeWidth={3}
-                                    fillOpacity={1}
-                                    fill="url(#colorIngresos)"
-                                />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-
-                <div className="card chart-card">
-                    <div className="card-header">
-                        <div>
-                            <h3 className="card-title">Ocupación Semanal</h3>
-                            <p className="card-subtitle">Porcentaje de ocupación por día</p>
-                        </div>
-                    </div>
-                    <div className="chart-container">
-                        <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={ocupacionSemanal}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" />
-                                <XAxis dataKey="dia" stroke="#64748b" fontSize={12} />
-                                <YAxis stroke="#64748b" fontSize={12} tickFormatter={(v) => `${v}%`} />
-                                <Tooltip
-                                    contentStyle={{
-                                        background: '#1e293b',
-                                        border: '1px solid rgba(255,255,255,0.1)',
-                                        borderRadius: '8px',
-                                        color: '#f8fafc'
-                                    }}
-                                    formatter={(value) => [`${value}%`, 'Ocupación']}
-                                />
-                                <Bar dataKey="ocupacion" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-            </div>
-
-            {/* Charts Row 2 */}
-            <div className="grid grid-cols-3 mb-6">
-                <div className="card chart-card">
-                    <div className="card-header">
-                        <div>
-                            <h3 className="card-title">Ingresos por Tipo</h3>
-                            <p className="card-subtitle">Distribución de ingresos</p>
-                        </div>
-                    </div>
-                    <div className="chart-container">
-                        <ResponsiveContainer width="100%" height={250}>
-                            <PieChart>
-                                <Pie
-                                    data={ocupacionPorTipo}
-                                    cx="50%"
-                                    cy="50%"
-                                    innerRadius={50}
-                                    outerRadius={80}
-                                    paddingAngle={3}
-                                    dataKey="ingresos"
-                                >
-                                    {ocupacionPorTipo.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                    ))}
-                                </Pie>
-                                <Tooltip
-                                    contentStyle={{
-                                        background: '#1e293b',
-                                        border: '1px solid rgba(255,255,255,0.1)',
-                                        borderRadius: '8px',
-                                        color: '#f8fafc'
-                                    }}
-                                    formatter={(value) => [`S/ ${value}`, 'Ingresos']}
-                                />
-                            </PieChart>
-                        </ResponsiveContainer>
-                        <div className="pie-legend">
-                            {ocupacionPorTipo.map((item, index) => (
-                                <div key={item.name} className="pie-legend-item">
-                                    <span className="pie-legend-dot" style={{ background: COLORS[index] }}></span>
-                                    <span className="pie-legend-label">{item.name}</span>
-                                    <span className="pie-legend-value">S/ {item.ingresos}</span>
+                    {/* Ocupación Tab */}
+                    {activeTab === 'ocupacion' && ocupacionData && (
+                        <div className="report-content">
+                            <div className="stats-row">
+                                <div className="stat-card primary">
+                                    <Percent size={24} />
+                                    <div className="stat-content">
+                                        <span className="stat-value">{ocupacionData.promedio_ocupacion}%</span>
+                                        <span className="stat-label">Ocupación Promedio</span>
+                                    </div>
                                 </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
+                                <div className="stat-card">
+                                    <BedDouble size={24} />
+                                    <div className="stat-content">
+                                        <span className="stat-value">{ocupacionData.total_habitaciones}</span>
+                                        <span className="stat-label">Total Habitaciones</span>
+                                    </div>
+                                </div>
+                                <div className="stat-card">
+                                    <Calendar size={24} />
+                                    <div className="stat-content">
+                                        <span className="stat-value">{ocupacionData.dias_analizados}</span>
+                                        <span className="stat-label">Días Analizados</span>
+                                    </div>
+                                </div>
+                            </div>
 
-                <div className="card chart-card" style={{ gridColumn: 'span 2' }}>
-                    <div className="card-header">
-                        <div>
-                            <h3 className="card-title">Ocupación por Tipo de Habitación</h3>
-                            <p className="card-subtitle">Comparativa de ocupación</p>
+                            <div className="card">
+                                <div className="card-header">
+                                    <h3 className="card-title">Ocupación Diaria</h3>
+                                </div>
+                                <div className="chart-container">
+                                    <ResponsiveContainer width="100%" height={300}>
+                                        <AreaChart data={ocupacionData.ocupacion_diaria}>
+                                            <defs>
+                                                <linearGradient id="colorOcupacion" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                                                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                                            <XAxis dataKey="dia" stroke="var(--text-muted)" fontSize={12} />
+                                            <YAxis stroke="var(--text-muted)" fontSize={12} unit="%" />
+                                            <Tooltip
+                                                formatter={(value) => [`${value}%`, 'Ocupación']}
+                                                contentStyle={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '8px' }}
+                                            />
+                                            <Area type="monotone" dataKey="porcentaje" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorOcupacion)" />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <div className="chart-container">
-                        <ResponsiveContainer width="100%" height={250}>
-                            <BarChart data={ocupacionPorTipo} layout="vertical">
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" />
-                                <XAxis type="number" stroke="#64748b" fontSize={12} domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
-                                <YAxis type="category" dataKey="name" stroke="#64748b" fontSize={12} width={80} />
-                                <Tooltip
-                                    contentStyle={{
-                                        background: '#1e293b',
-                                        border: '1px solid rgba(255,255,255,0.1)',
-                                        borderRadius: '8px',
-                                        color: '#f8fafc'
-                                    }}
-                                    formatter={(value) => [`${value}%`, 'Ocupación']}
-                                />
-                                <Bar dataKey="ocupacion" radius={[0, 4, 4, 0]}>
-                                    {ocupacionPorTipo.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                    ))}
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-            </div>
+                    )}
 
-            {/* Reports Table */}
-            <div className="card">
-                <div className="card-header">
-                    <div>
-                        <h3 className="card-title">Reportes Disponibles</h3>
-                        <p className="card-subtitle">Genera y descarga reportes detallados</p>
-                    </div>
-                </div>
-                <div className="reports-list">
-                    <div className="report-item">
-                        <div className="report-icon">
-                            <BarChart3 size={20} />
+                    {/* Ingresos Tab */}
+                    {activeTab === 'ingresos' && ingresosData && (
+                        <div className="report-content">
+                            <div className="stats-row">
+                                <div className="stat-card success">
+                                    <DollarSign size={24} />
+                                    <div className="stat-content">
+                                        <span className="stat-value">S/ {ingresosData.total_ingresos?.toFixed(2)}</span>
+                                        <span className="stat-label">Total Ingresos</span>
+                                    </div>
+                                </div>
+                                <div className="stat-card">
+                                    <TrendingUp size={24} />
+                                    <div className="stat-content">
+                                        <span className="stat-value">S/ {ingresosData.promedio_diario?.toFixed(2)}</span>
+                                        <span className="stat-label">Promedio Diario</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="reports-grid">
+                                <div className="card">
+                                    <div className="card-header">
+                                        <h3 className="card-title">Ingresos Diarios</h3>
+                                    </div>
+                                    <div className="chart-container">
+                                        <ResponsiveContainer width="100%" height={250}>
+                                            <BarChart data={ingresosData.ingresos_diarios}>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                                                <XAxis dataKey="dia" stroke="var(--text-muted)" fontSize={10} />
+                                                <YAxis stroke="var(--text-muted)" fontSize={12} tickFormatter={(v) => `S/${v}`} />
+                                                <Tooltip
+                                                    formatter={(value) => [`S/ ${value.toFixed(2)}`, 'Ingreso']}
+                                                    contentStyle={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '8px' }}
+                                                />
+                                                <Bar dataKey="ingreso" fill="#10b981" radius={[4, 4, 0, 0]} />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </div>
+
+                                <div className="card">
+                                    <div className="card-header">
+                                        <h3 className="card-title">Por Método de Pago</h3>
+                                    </div>
+                                    <div className="chart-container-sm">
+                                        <ResponsiveContainer width="100%" height={200}>
+                                            <PieChart>
+                                                <Pie
+                                                    data={metodosPieData}
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    innerRadius={40}
+                                                    outerRadius={70}
+                                                    paddingAngle={2}
+                                                    dataKey="value"
+                                                >
+                                                    {metodosPieData.map((entry, index) => (
+                                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                    ))}
+                                                </Pie>
+                                                <Tooltip formatter={(value) => `S/ ${value.toFixed(2)}`} />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                    <div className="pie-legend">
+                                        {metodosPieData.map((item, i) => (
+                                            <div key={i} className="legend-item">
+                                                <span className="legend-dot" style={{ backgroundColor: COLORS[i % COLORS.length] }}></span>
+                                                {getMetodoIcon(item.name)}
+                                                <span className="legend-label">{item.name}</span>
+                                                <span className="legend-value">S/ {item.value.toFixed(2)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {ingresosData.top_dias?.length > 0 && (
+                                <div className="card">
+                                    <div className="card-header">
+                                        <h3 className="card-title">Mejores Días</h3>
+                                    </div>
+                                    <div className="top-list">
+                                        {ingresosData.top_dias.map((dia, i) => (
+                                            <div key={i} className="top-item">
+                                                <span className="top-rank">#{i + 1}</span>
+                                                <span className="top-name">{new Date(dia.fecha).toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'short' })}</span>
+                                                <span className="top-value">S/ {dia.ingreso.toFixed(2)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                        <div className="report-info">
-                            <span className="report-name">Reporte de Ocupación</span>
-                            <span className="report-desc">Análisis detallado de ocupación por período</span>
+                    )}
+
+                    {/* Huéspedes Tab */}
+                    {activeTab === 'huespedes' && huespedesData && (
+                        <div className="report-content">
+                            <div className="stats-row">
+                                <div className="stat-card">
+                                    <Users size={24} />
+                                    <div className="stat-content">
+                                        <span className="stat-value">{huespedesData.total_huespedes}</span>
+                                        <span className="stat-label">Total Huéspedes</span>
+                                    </div>
+                                </div>
+                                <div className="stat-card success">
+                                    <DollarSign size={24} />
+                                    <div className="stat-content">
+                                        <span className="stat-value">S/ {huespedesData.gasto_promedio}</span>
+                                        <span className="stat-label">Gasto Promedio</span>
+                                    </div>
+                                </div>
+                                <div className="stat-card warning">
+                                    <Crown size={24} />
+                                    <div className="stat-content">
+                                        <span className="stat-value">{huespedesData.huespedes_frecuentes}</span>
+                                        <span className="stat-label">Huéspedes VIP</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="reports-grid">
+                                <div className="card">
+                                    <div className="card-header">
+                                        <h3 className="card-title">
+                                            <Globe size={18} /> Por Nacionalidad
+                                        </h3>
+                                    </div>
+                                    <div className="distribution-list">
+                                        {huespedesData.por_nacionalidad?.map((item, i) => (
+                                            <div key={i} className="distribution-item">
+                                                <span className="distribution-name">{item.name}</span>
+                                                <div className="distribution-bar">
+                                                    <div
+                                                        className="distribution-fill"
+                                                        style={{
+                                                            width: `${(item.value / huespedesData.total_huespedes) * 100}%`,
+                                                            backgroundColor: COLORS[i % COLORS.length]
+                                                        }}
+                                                    ></div>
+                                                </div>
+                                                <span className="distribution-value">{item.value}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="card">
+                                    <div className="card-header">
+                                        <h3 className="card-title">
+                                            <MapPin size={18} /> Por Procedencia
+                                        </h3>
+                                    </div>
+                                    <div className="distribution-list">
+                                        {huespedesData.por_procedencia?.map((item, i) => (
+                                            <div key={i} className="distribution-item">
+                                                <span className="distribution-name">{item.name}</span>
+                                                <div className="distribution-bar">
+                                                    <div
+                                                        className="distribution-fill"
+                                                        style={{
+                                                            width: `${(item.value / huespedesData.total_huespedes) * 100}%`,
+                                                            backgroundColor: COLORS[(i + 3) % COLORS.length]
+                                                        }}
+                                                    ></div>
+                                                </div>
+                                                <span className="distribution-value">{item.value}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {huespedesData.top_huespedes?.length > 0 && (
+                                <div className="card">
+                                    <div className="card-header">
+                                        <h3 className="card-title">
+                                            <Crown size={18} /> Top Huéspedes por Gasto
+                                        </h3>
+                                    </div>
+                                    <div className="top-list">
+                                        {huespedesData.top_huespedes.map((h, i) => (
+                                            <div key={i} className="top-item">
+                                                <span className="top-rank">#{i + 1}</span>
+                                                <span className="top-name">{h.nombre}</span>
+                                                <span className="top-value">S/ {h.total.toFixed(2)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                        <button className="btn btn-secondary btn-sm">
-                            <Download size={16} />
-                            Descargar
-                        </button>
-                    </div>
-                    <div className="report-item">
-                        <div className="report-icon">
-                            <DollarSign size={20} />
-                        </div>
-                        <div className="report-info">
-                            <span className="report-name">Reporte de Ingresos</span>
-                            <span className="report-desc">Desglose de ingresos y medios de pago</span>
-                        </div>
-                        <button className="btn btn-secondary btn-sm">
-                            <Download size={16} />
-                            Descargar
-                        </button>
-                    </div>
-                    <div className="report-item">
-                        <div className="report-icon">
-                            <Users size={20} />
-                        </div>
-                        <div className="report-info">
-                            <span className="report-name">Reporte de Huéspedes</span>
-                            <span className="report-desc">Estadísticas de huéspedes y frecuencia</span>
-                        </div>
-                        <button className="btn btn-secondary btn-sm">
-                            <Download size={16} />
-                            Descargar
-                        </button>
-                    </div>
-                    <div className="report-item">
-                        <div className="report-icon">
-                            <FileText size={20} />
-                        </div>
-                        <div className="report-info">
-                            <span className="report-name">Reporte Tributario</span>
-                            <span className="report-desc">Resumen para declaraciones SUNAT</span>
-                        </div>
-                        <button className="btn btn-secondary btn-sm">
-                            <Download size={16} />
-                            Descargar
-                        </button>
-                    </div>
-                </div>
-            </div>
+                    )}
+                </>
+            )}
         </div>
     );
 }
 
 export default Reportes;
-

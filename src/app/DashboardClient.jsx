@@ -7,17 +7,13 @@ import {
     DollarSign,
     TrendingUp,
     ArrowUpRight,
-    ArrowDownRight,
     AlertTriangle,
     Clock,
     UserCheck,
     UserX,
-    Loader,
     CalendarCheck,
-    LogIn,
-    LogOut,
-    UserPlus,
-    User
+    Sparkles,
+    RefreshCw
 } from 'lucide-react';
 import {
     AreaChart,
@@ -27,409 +23,289 @@ import {
     CartesianGrid,
     Tooltip,
     ResponsiveContainer,
-    BarChart,
-    Bar,
     PieChart,
     Pie,
     Cell
 } from 'recharts';
-import { estadisticasDia, alertas, ocupacionSemanal, ingresosMensuales, habitaciones, huespedes } from '@/data/mockData';
-import InfoTooltip from '@/components/ui/InfoTooltip';
 import './Dashboard.css';
 
 const COLORS = ['#22c55e', '#ef4444', '#f59e0b', '#a855f7'];
 
-function Dashboard() {
+function Dashboard({ initialData = {} }) {
     const router = useRouter();
-    const roomsByStatus = [
-        { name: 'Disponibles', value: estadisticasDia.disponibles, color: '#22c55e' },
-        { name: 'Ocupadas', value: estadisticasDia.ocupadas, color: '#ef4444' },
-        { name: 'Limpieza', value: estadisticasDia.enLimpieza, color: '#f59e0b' },
-        { name: 'Mantenimiento', value: estadisticasDia.enMantenimiento, color: '#a855f7' },
-    ];
 
-    const todayCheckIns = huespedes.filter(h =>
-        h.checkInDate.startsWith('2024-12-21')
-    );
+    const {
+        habitaciones = {},
+        ocupacion = 0,
+        ingresos = {},
+        estadisticas = {},
+        acciones = {},
+        grafico = []
+    } = initialData;
 
-    const todayCheckOuts = huespedes.filter(h =>
-        h.checkOutDate.startsWith('2024-12-21')
-    );
+    const roomPieData = [
+        { name: 'Disponibles', value: habitaciones.disponibles || 0, color: '#22c55e' },
+        { name: 'Ocupadas', value: habitaciones.ocupadas || 0, color: '#ef4444' },
+        { name: 'Limpieza', value: habitaciones.limpieza || 0, color: '#f59e0b' },
+        { name: 'Mantenimiento', value: habitaciones.mantenimiento || 0, color: '#a855f7' }
+    ].filter(d => d.value > 0);
+
+    const navigateTo = (path) => {
+        router.push(path);
+    };
 
     return (
         <div className="dashboard">
-            <div className="page-header">
+            {/* Header */}
+            <div className="dashboard-header">
                 <div>
-                    <h1 className="page-title">Dashboard</h1>
-                    <p className="page-subtitle">Bienvenido al sistema de gestión hotelera - {new Date().toLocaleDateString('es-PE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                </div>
-                <div className="page-header-actions">
-                    <button className="btn btn-primary" onClick={() => router.push('/checkin')}>
-                        <LogIn size={18} />
-                        Nuevo Check-in
-                    </button>
-                </div>
-            </div>
-
-            {/* Quick Stats Row */}
-            <div className="quick-stats">
-                <div className="quick-stat">
-                    <span className="quick-stat-dot disponible"></span>
-                    <span className="quick-stat-value">{estadisticasDia.disponibles}</span>
-                    <span className="quick-stat-label">Disponibles</span>
-                </div>
-                <div className="quick-stat">
-                    <span className="quick-stat-dot ocupada"></span>
-                    <span className="quick-stat-value">{estadisticasDia.ocupadas}</span>
-                    <span className="quick-stat-label">Ocupadas</span>
-                </div>
-                <div className="quick-stat">
-                    <span className="quick-stat-dot limpieza"></span>
-                    <span className="quick-stat-value">{estadisticasDia.enLimpieza}</span>
-                    <span className="quick-stat-label">Limpieza</span>
-                </div>
-                <div className="quick-stat">
-                    <span className="quick-stat-dot mantenimiento"></span>
-                    <span className="quick-stat-value">{estadisticasDia.enMantenimiento}</span>
-                    <span className="quick-stat-label">Mantenimiento</span>
-                </div>
-            </div>
-
-            {/* Main Stats Cards */}
-            <div className="grid grid-cols-4 mb-6">
-                <div className="stat-card primary">
-                    <div className="stat-card-header">
-                        <div className="stat-card-icon">
-                            <BedDouble size={24} />
-                        </div>
-                        <InfoTooltip text="Número total de habitaciones del hotel y porcentaje de ocupación actual" />
-                    </div>
-                    <div className="stat-value">{estadisticasDia.totalHabitaciones}</div>
-                    <div className="stat-label">Total Habitaciones</div>
-                    <div className="stat-change positive">
-                        <ArrowUpRight size={14} />
-                        <span>{estadisticasDia.ocupacionPorcentaje}% ocupación</span>
-                    </div>
-                </div>
-
-                <div className="stat-card success">
-                    <div className="stat-card-header">
-                        <div className="stat-card-icon">
-                            <Users size={24} />
-                        </div>
-                        <InfoTooltip text="Huéspedes con reservas activas, incluyendo los que están dentro y fuera del hotel" />
-                    </div>
-                    <div className="stat-value">{estadisticasDia.huespedsDentro + estadisticasDia.huespedesFuera}</div>
-                    <div className="stat-label">Huéspedes Activos</div>
-                    <div className="stat-change positive">
-                        <UserCheck size={14} />
-                        <span>{estadisticasDia.huespedsDentro} dentro</span>
-                    </div>
-                </div>
-
-                <div className="stat-card gold">
-                    <div className="stat-card-header">
-                        <div className="stat-card-icon">
-                            <DollarSign size={24} />
-                        </div>
-                        <InfoTooltip text="Total de ingresos generados el día de hoy por pagos de habitaciones y servicios" />
-                    </div>
-                    <div className="stat-value">S/ {estadisticasDia.ingresosHoy.toLocaleString()}</div>
-                    <div className="stat-label">Ingresos de Hoy</div>
-                    <div className="stat-change positive">
-                        <TrendingUp size={14} />
-                        <span>+12% vs ayer</span>
-                    </div>
-                </div>
-
-                <div className="stat-card purple">
-                    <div className="stat-card-header">
-                        <div className="stat-card-icon">
-                            <CalendarCheck size={24} />
-                        </div>
-                        <InfoTooltip text="Número de check-ins y check-outs programados para el día de hoy" />
-                    </div>
-                    <div className="stat-value">{estadisticasDia.checkInsHoy}</div>
-                    <div className="stat-label">Check-ins Hoy</div>
-                    <div className="stat-change">
-                        <LogOut size={14} />
-                        <span>{estadisticasDia.checkOutsHoy} check-outs</span>
-                    </div>
-                </div>
-            </div>
-
-            {/* Quick Access Section - Habitaciones Disponibles y Alertas */}
-            <div className="grid grid-cols-3 mb-6">
-                {/* Habitaciones Disponibles HOY */}
-                <div className="card" style={{ gridColumn: 'span 2' }}>
-                    <div className="card-header">
-                        <div>
-                            <h3 className="card-title">Habitaciones Disponibles Ahora</h3>
-                            <p className="card-subtitle">Listas para check-in inmediato</p>
-                        </div>
-                        <button className="btn btn-primary" onClick={() => router.push('/checkin')}>
-                            <UserPlus size={16} />
-                            Nuevo Check-in
-                        </button>
-                    </div>
-                    <div className="available-rooms-quick">
-                        {habitaciones.filter(h => h.estado === 'disponible').slice(0, 6).map((room) => (
-                            <div key={room.id} className="quick-room-card" onClick={() => router.push('/checkin')}>
-                                <div className="quick-room-header">
-                                    <span className="quick-room-number">{room.numero}</span>
-                                    <span className="badge badge-disponible">Disponible</span>
-                                </div>
-                                <div className="quick-room-info">
-                                    <span className="quick-room-type">{room.tipo}</span>
-                                    <span className="quick-room-price">S/ {room.precioActual}/noche</span>
-                                </div>
-                                <div className="quick-room-details">
-                                    <span><User size={12} /> {room.capacidad}</span>
-                                    <span>Piso {room.piso}</span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Alertas de Huéspedes Fuera */}
-                <div className="card">
-                    <div className="card-header">
-                        <div>
-                            <h3 className="card-title">Huéspedes Fuera</h3>
-                            <p className="card-subtitle">Requieren atención</p>
-                        </div>
-                        <span className="alert-count">{huespedes.filter(h => h.estado === 'fuera').length}</span>
-                    </div>
-                    <div className="guests-out-list">
-                        {huespedes.filter(h => h.estado === 'fuera').slice(0, 4).map((guest) => {
-                            const habitacion = habitaciones.find(hab => hab.id === guest.habitacionId);
-                            return (
-                                <div key={guest.id} className="guest-out-item">
-                                    <div className="guest-out-avatar">
-                                        {guest.nombre.split(' ').map(n => n[0]).join('')}
-                                    </div>
-                                    <div className="guest-out-info">
-                                        <span className="guest-out-name">{guest.nombre}</span>
-                                        <span className="guest-out-room">Hab. {habitacion?.numero || 'N/A'}</span>
-                                    </div>
-                                    <span className="badge badge-fuera">Fuera</span>
-                                </div>
-                            );
+                    <h1 className="dashboard-title">Dashboard</h1>
+                    <p className="dashboard-subtitle">
+                        {new Date().toLocaleDateString('es-PE', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
                         })}
-                        {huespedes.filter(h => h.estado === 'fuera').length === 0 && (
-                            <div className="no-activity">
-                                <UserCheck size={32} style={{ opacity: 0.3, marginBottom: '0.5rem' }} />
-                                <p>Todos los huéspedes están dentro</p>
-                            </div>
-                        )}
+                    </p>
+                </div>
+                <button className="btn btn-secondary" onClick={() => router.refresh()}>
+                    <RefreshCw size={18} />
+                    Actualizar
+                </button>
+            </div>
+
+            {/* Stats Cards */}
+            <div className="stats-grid">
+                <div className="stat-card" onClick={() => navigateTo('/habitaciones')}>
+                    <div className="stat-icon blue">
+                        <BedDouble size={24} />
+                    </div>
+                    <div className="stat-content">
+                        <span className="stat-value">{habitaciones.disponibles || 0}</span>
+                        <span className="stat-label">Disponibles</span>
+                    </div>
+                    <div className="stat-trend neutral">
+                        de {habitaciones.total || 0}
+                    </div>
+                </div>
+
+                <div className="stat-card" onClick={() => navigateTo('/huespedes')}>
+                    <div className="stat-icon green">
+                        <Users size={24} />
+                    </div>
+                    <div className="stat-content">
+                        <span className="stat-value">{estadisticas.huespedes_activos || 0}</span>
+                        <span className="stat-label">Huéspedes Activos</span>
+                    </div>
+                </div>
+
+                <div className="stat-card" onClick={() => navigateTo('/pagos')}>
+                    <div className="stat-icon emerald">
+                        <DollarSign size={24} />
+                    </div>
+                    <div className="stat-content">
+                        <span className="stat-value">S/ {(ingresos.hoy || 0).toFixed(0)}</span>
+                        <span className="stat-label">Ingresos Hoy</span>
+                    </div>
+                    <div className="stat-trend positive">
+                        <ArrowUpRight size={16} />
+                        Semana: S/ {(ingresos.semana || 0).toFixed(0)}
+                    </div>
+                </div>
+
+                <div className="stat-card">
+                    <div className="stat-icon purple">
+                        <TrendingUp size={24} />
+                    </div>
+                    <div className="stat-content">
+                        <span className="stat-value">{ocupacion}%</span>
+                        <span className="stat-label">Ocupación</span>
                     </div>
                 </div>
             </div>
 
-            {/* Alertas, Actividad y Estado Actual */}
-            <div className="grid grid-cols-3 mb-6">
-                {/* Alertas */}
-                <div className="card">
-                    <div className="card-header">
-                        <div>
-                            <h3 className="card-title">Alertas</h3>
-                            <p className="card-subtitle">Requieren atención</p>
+            {/* Main Content */}
+            <div className="dashboard-content">
+                {/* Left Column */}
+                <div className="dashboard-main">
+                    {/* Revenue Chart */}
+                    <div className="card">
+                        <div className="card-header">
+                            <h3 className="card-title">Ingresos de la Semana</h3>
                         </div>
-                        <span className="alert-count">{alertas.length}</span>
+                        <div className="chart-container">
+                            <ResponsiveContainer width="100%" height={250}>
+                                <AreaChart data={grafico}>
+                                    <defs>
+                                        <linearGradient id="colorIngreso" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                                    <XAxis
+                                        dataKey="dia"
+                                        stroke="var(--text-muted)"
+                                        fontSize={12}
+                                    />
+                                    <YAxis
+                                        stroke="var(--text-muted)"
+                                        fontSize={12}
+                                        tickFormatter={(v) => `S/${v}`}
+                                    />
+                                    <Tooltip
+                                        formatter={(value) => [`S/ ${value.toFixed(2)}`, 'Ingreso']}
+                                        contentStyle={{
+                                            backgroundColor: 'var(--card-bg)',
+                                            border: '1px solid var(--border-color)',
+                                            borderRadius: '8px'
+                                        }}
+                                    />
+                                    <Area
+                                        type="monotone"
+                                        dataKey="ingreso"
+                                        stroke="#10b981"
+                                        strokeWidth={2}
+                                        fillOpacity={1}
+                                        fill="url(#colorIngreso)"
+                                    />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
                     </div>
-                    <div className="alerts-list">
-                        {alertas.map((alerta) => (
-                            <div key={alerta.id} className={`alert-card urgencia-${alerta.urgencia}`}>
-                                <div className="alert-icon">
-                                    {alerta.tipo === 'pago_pendiente' && <DollarSign size={16} />}
-                                    {alerta.tipo === 'salida_proxima' && <Clock size={16} />}
-                                    {alerta.tipo === 'mantenimiento' && <AlertTriangle size={16} />}
-                                </div>
-                                <div className="alert-content">
-                                    <div className="alert-message">{alerta.mensaje}</div>
-                                    <div className="alert-room">Habitación {alerta.habitacion}</div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
 
-                {/* Actividad de Hoy */}
-                <div className="card">
-                    <div className="card-header">
-                        <div>
-                            <h3 className="card-title">Actividad de Hoy</h3>
-                            <p className="card-subtitle">Check-ins y check-outs</p>
+                    {/* Pending Actions */}
+                    <div className="card">
+                        <div className="card-header">
+                            <h3 className="card-title">
+                                <AlertTriangle size={18} className="text-warning" />
+                                Acciones Pendientes
+                            </h3>
                         </div>
-                    </div>
-                    <div className="activity-list">
-                        <div className="activity-section">
-                            <h4 className="activity-section-title">
-                                <LogIn size={16} />
-                                Check-ins
-                            </h4>
-                            {todayCheckIns.length > 0 ? (
-                                todayCheckIns.map((huesped) => {
-                                    const hab = habitaciones.find(h => h.id === huesped.habitacionId);
-                                    return (
-                                        <div key={huesped.id} className="activity-item">
-                                            <div className="avatar avatar-sm">{huesped.nombre.charAt(0)}</div>
-                                            <div className="activity-info">
-                                                <span className="activity-name">{huesped.nombre}</span>
-                                                <span className="activity-room">Hab. {hab?.numero}</span>
-                                            </div>
-                                            <span className={`badge badge-${huesped.estado}`}>{huesped.estado}</span>
-                                        </div>
-                                    );
-                                })
-                            ) : (
-                                <p className="no-activity">Sin check-ins programados</p>
-                            )}
-                        </div>
-                        <div className="activity-section">
-                            <h4 className="activity-section-title">
-                                <LogOut size={16} />
-                                Check-outs
-                            </h4>
-                            {todayCheckOuts.length > 0 ? (
-                                todayCheckOuts.map((huesped) => {
-                                    const hab = habitaciones.find(h => h.id === huesped.habitacionId);
-                                    return (
-                                        <div key={huesped.id} className="activity-item">
-                                            <div className="avatar avatar-sm">{huesped.nombre.charAt(0)}</div>
-                                            <div className="activity-info">
-                                                <span className="activity-name">{huesped.nombre}</span>
-                                                <span className="activity-room">Hab. {hab?.numero}</span>
-                                            </div>
-                                            <span className="badge badge-salida">Salida</span>
-                                        </div>
-                                    );
-                                })
-                            ) : (
-                                <p className="no-activity">Sin check-outs programados</p>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Estado de Habitaciones Pie */}
-                <div className="card chart-card">
-                    <div className="card-header">
-                        <div>
-                            <h3 className="card-title">Estado Actual</h3>
-                            <p className="card-subtitle">Distribución de habitaciones</p>
-                        </div>
-                    </div>
-                    <div className="chart-container pie-chart-container">
-                        <ResponsiveContainer width="100%" height={200}>
-                            <PieChart>
-                                <Pie
-                                    data={roomsByStatus}
-                                    cx="50%"
-                                    cy="50%"
-                                    innerRadius={50}
-                                    outerRadius={80}
-                                    paddingAngle={3}
-                                    dataKey="value"
-                                >
-                                    {roomsByStatus.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                        <div className="pending-actions">
+                            {/* Check-ins */}
+                            {estadisticas.checkins_hoy > 0 && (
+                                <div className="action-item success" onClick={() => navigateTo('/checkin')}>
+                                    <div className="action-icon">
+                                        <UserCheck size={20} />
+                                    </div>
+                                    <div className="action-content">
+                                        <span className="action-count">{estadisticas.checkins_hoy}</span>
+                                        <span className="action-label">Check-ins esperados</span>
+                                    </div>
+                                    {acciones.checkins?.slice(0, 2).map((c, i) => (
+                                        <span key={i} className="action-detail">
+                                            Hab {c.habitacion?.numero} - {c.nombre_cliente}
+                                        </span>
                                     ))}
-                                </Pie>
-                                <Tooltip
-                                    contentStyle={{
-                                        background: '#1e293b',
-                                        border: '1px solid rgba(255,255,255,0.1)',
-                                        borderRadius: '8px',
-                                        color: '#f8fafc'
-                                    }}
-                                />
-                            </PieChart>
-                        </ResponsiveContainer>
+                                </div>
+                            )}
+
+                            {/* Check-outs */}
+                            {estadisticas.checkouts_hoy > 0 && (
+                                <div className="action-item warning" onClick={() => navigateTo('/checkout')}>
+                                    <div className="action-icon">
+                                        <UserX size={20} />
+                                    </div>
+                                    <div className="action-content">
+                                        <span className="action-count">{estadisticas.checkouts_hoy}</span>
+                                        <span className="action-label">Check-outs hoy</span>
+                                    </div>
+                                    {acciones.checkouts?.slice(0, 2).map((c, i) => (
+                                        <span key={i} className="action-detail">
+                                            Hab {c.habitacion?.numero} - {c.huesped?.nombre}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Cleaning */}
+                            {estadisticas.limpiezas_pendientes > 0 && (
+                                <div className="action-item info" onClick={() => navigateTo('/limpieza')}>
+                                    <div className="action-icon">
+                                        <Sparkles size={20} />
+                                    </div>
+                                    <div className="action-content">
+                                        <span className="action-count">{estadisticas.limpiezas_pendientes}</span>
+                                        <span className="action-label">Limpiezas pendientes</span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {estadisticas.checkins_hoy === 0 &&
+                                estadisticas.checkouts_hoy === 0 &&
+                                estadisticas.limpiezas_pendientes === 0 && (
+                                    <div className="no-pending">
+                                        <CalendarCheck size={32} className="text-success" />
+                                        <p>¡Todo al día!</p>
+                                    </div>
+                                )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Right Column */}
+                <div className="dashboard-sidebar">
+                    {/* Room Distribution */}
+                    <div className="card">
+                        <div className="card-header">
+                            <h3 className="card-title">Estado de Habitaciones</h3>
+                        </div>
+                        <div className="pie-container">
+                            <ResponsiveContainer width="100%" height={200}>
+                                <PieChart>
+                                    <Pie
+                                        data={roomPieData}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={50}
+                                        outerRadius={80}
+                                        paddingAngle={2}
+                                        dataKey="value"
+                                    >
+                                        {roomPieData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
                         <div className="pie-legend">
-                            {roomsByStatus.map((item) => (
-                                <div key={item.name} className="pie-legend-item">
-                                    <span className="pie-legend-dot" style={{ background: item.color }}></span>
-                                    <span className="pie-legend-label">{item.name}</span>
-                                    <span className="pie-legend-value">{item.value}</span>
+                            {roomPieData.map((item, i) => (
+                                <div key={i} className="legend-item">
+                                    <span className="legend-dot" style={{ backgroundColor: item.color }}></span>
+                                    <span className="legend-label">{item.name}</span>
+                                    <span className="legend-value">{item.value}</span>
                                 </div>
                             ))}
                         </div>
                     </div>
-                </div>
-            </div>
 
-            {/* Gráficos de Tendencias */}
-            <div className="grid grid-cols-2">
-                {/* Ocupación Semanal */}
-                <div className="card chart-card">
-                    <div className="card-header">
-                        <div>
-                            <h3 className="card-title">Ocupación Semanal</h3>
-                            <p className="card-subtitle">Porcentaje de ocupación por día</p>
+                    {/* Quick Actions */}
+                    <div className="card">
+                        <div className="card-header">
+                            <h3 className="card-title">Acciones Rápidas</h3>
                         </div>
-                    </div>
-                    <div className="chart-container">
-                        <ResponsiveContainer width="100%" height={280}>
-                            <AreaChart data={ocupacionSemanal}>
-                                <defs>
-                                    <linearGradient id="colorOcupacion" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" />
-                                <XAxis dataKey="dia" stroke="#64748b" fontSize={12} />
-                                <YAxis stroke="#64748b" fontSize={12} />
-                                <Tooltip
-                                    contentStyle={{
-                                        background: '#1e293b',
-                                        border: '1px solid rgba(255,255,255,0.1)',
-                                        borderRadius: '8px',
-                                        color: '#f8fafc'
-                                    }}
-                                    formatter={(value) => [`${value}%`, 'Ocupación']}
-                                />
-                                <Area
-                                    type="monotone"
-                                    dataKey="ocupacion"
-                                    stroke="#0ea5e9"
-                                    strokeWidth={3}
-                                    fillOpacity={1}
-                                    fill="url(#colorOcupacion)"
-                                />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-
-                {/* Ingresos Mensuales */}
-                <div className="card chart-card">
-                    <div className="card-header">
-                        <div>
-                            <h3 className="card-title">Ingresos Mensuales</h3>
-                            <p className="card-subtitle">Últimos 6 meses</p>
+                        <div className="quick-actions">
+                            <button className="quick-action-btn" onClick={() => navigateTo('/checkin')}>
+                                <UserCheck size={20} />
+                                Check-in
+                            </button>
+                            <button className="quick-action-btn" onClick={() => navigateTo('/checkout')}>
+                                <UserX size={20} />
+                                Check-out
+                            </button>
+                            <button className="quick-action-btn" onClick={() => navigateTo('/reservas')}>
+                                <CalendarCheck size={20} />
+                                Nueva Reserva
+                            </button>
+                            <button className="quick-action-btn" onClick={() => navigateTo('/pagos')}>
+                                <DollarSign size={20} />
+                                Registrar Pago
+                            </button>
                         </div>
-                    </div>
-                    <div className="chart-container">
-                        <ResponsiveContainer width="100%" height={280}>
-                            <BarChart data={ingresosMensuales}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" />
-                                <XAxis dataKey="mes" stroke="#64748b" fontSize={12} />
-                                <YAxis stroke="#64748b" fontSize={12} />
-                                <Tooltip
-                                    contentStyle={{
-                                        background: '#1e293b',
-                                        border: '1px solid rgba(255,255,255,0.1)',
-                                        borderRadius: '8px',
-                                        color: '#f8fafc'
-                                    }}
-                                    formatter={(value) => [`S/ ${value.toLocaleString()}`, 'Ingresos']}
-                                />
-                                <Bar dataKey="ingresos" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                            </BarChart>
-                        </ResponsiveContainer>
                     </div>
                 </div>
             </div>
