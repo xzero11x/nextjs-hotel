@@ -1,0 +1,409 @@
+.checkin-page {
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+/* Progress Steps */
+.progress-steps {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-8);
+    padding: var(--space-5);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+}
+
+.progress-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.step-number {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-weight: 500;
+    font-size: 0.875rem;
+    background: var(--bg-elevated);
+    color: var(--text-muted);
+    border: 1px solid var(--border-default);
+    transition: all var(--transition-base);
+}
+
+.progress-step.active .step-number {
+    background: var(--primary-600);
+    color: white;
+    border-color: var(--primary-600);
+}
+
+.progress-step.completed .step-number {
+    background: var(--success);
+    color: white;
+    border-color: var(--success);
+}
+
+.step-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.progress-step.active .step-label {
+    color: var(--text-primary);
+}
+
+.progress-line {
+    flex: 1;
+    max-width: 80px;
+    height: 1px;
+    background: var(--border-default);
+}
+
+.step-content {
+    animation: fadeIn 0.2s ease;
+}
+
+.step-title {
+    font-size: 1.125rem;
+    color: var(--text-primary);
+    margin-bottom: var(--space-5);
+    text-align: center;
+    font-weight: 500;
+}
+
+/* Room Selection */
+.available-rooms-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: var(--space-3);
+    margin-bottom: var(--space-6);
+}
+
+.room-select-card {
+    position: relative;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    cursor: pointer;
+    transition: all var(--transition-base);
+}
+
+.room-select-card:hover {
+    border-color: var(--primary-500);
+}
+
+.room-select-card.selected {
+    border-color: var(--primary-500);
+    background: rgba(14, 165, 233, 0.05);
+}
+
+.room-select-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-3);
+}
+
+.room-select-type {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-transform: capitalize;
+    margin-bottom: var(--space-2);
+}
+
+.room-select-details {
+    display: flex;
+    gap: var(--space-4);
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    margin-bottom: var(--space-3);
+}
+
+.room-select-details span {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+.room-select-price {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.per-night {
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--text-muted);
+}
+
+.room-selected-badge {
+    position: absolute;
+    top: var(--space-2);
+    right: var(--space-2);
+    width: 24px;
+    height: 24px;
+    background: var(--success);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+}
+
+/* Form */
+.checkin-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-5);
+    margin-bottom: var(--space-6);
+}
+
+.form-card {
+    padding: var(--space-5);
+}
+
+.form-section-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: var(--space-4);
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-4);
+}
+
+/* Confirm */
+.confirm-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-5);
+    margin-bottom: var(--space-6);
+}
+
+.confirm-card {
+    padding: var(--space-5);
+}
+
+.confirm-section-title {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: var(--space-4);
+}
+
+.confirm-details {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    margin-bottom: var(--space-5);
+}
+
+.confirm-item {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    color: var(--text-muted);
+}
+
+.confirm-item>div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.confirm-label {
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.confirm-value {
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.confirm-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-4);
+    background: var(--bg-elevated);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-subtle);
+}
+
+.confirm-total span:first-child {
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.total-amount {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* Payment Methods */
+.payment-methods {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+.payment-method {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    flex: 1;
+    min-width: 70px;
+}
+
+.payment-method:hover {
+    border-color: var(--border-strong);
+}
+
+.payment-method.selected {
+    border-color: var(--primary-500);
+    background: rgba(14, 165, 233, 0.05);
+}
+
+.payment-method input {
+    display: none;
+}
+
+.payment-icon {
+    font-size: 1.25rem;
+}
+
+.payment-name {
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-transform: capitalize;
+}
+
+/* Step Actions */
+.step-actions {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-3);
+    margin-top: var(--space-6);
+}
+
+@media (max-width: 768px) {
+
+    .checkin-form-grid,
+    .confirm-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .progress-steps {
+        padding: var(--space-3);
+    }
+
+    .progress-line {
+        max-width: 40px;
+    }
+
+    .step-label {
+        font-size: 0.6875rem;
+    }
+
+    .available-rooms-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .payment-methods {
+        flex-direction: column;
+    }
+
+    .payment-method {
+        flex-direction: row;
+        justify-content: flex-start;
+        min-width: 100%;
+    }
+
+    .step-actions {
+        flex-direction: column-reverse;
+        width: 100%;
+    }
+
+    .step-actions .btn {
+        width: 100%;
+    }
+}
+
+@media (max-width: 640px) {
+    .progress-steps {
+        gap: var(--space-1);
+        padding: var(--space-2);
+    }
+
+    .step-number {
+        width: 32px;
+        height: 32px;
+        font-size: 0.75rem;
+    }
+
+    .step-label {
+        display: none;
+    }
+
+    .progress-line {
+        max-width: 20px;
+    }
+
+    .room-select-price {
+        font-size: 1.125rem;
+    }
+
+    .form-card,
+    .confirm-card {
+        padding: var(--space-4);
+    }
+
+    .total-amount {
+        font-size: 1.25rem;
+    }
+}

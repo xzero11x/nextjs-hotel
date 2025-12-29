@@ -1,0 +1,121 @@
+.reportes-page {
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.mb-6 {
+    margin-bottom: var(--space-6);
+}
+
+/* Chart Card */
+.chart-card .chart-container {
+    margin-top: var(--space-4);
+}
+
+.pie-legend {
+    margin-top: var(--space-4);
+}
+
+.pie-legend-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.pie-legend-item:last-child {
+    border-bottom: none;
+}
+
+.pie-legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.pie-legend-label {
+    flex: 1;
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+}
+
+.pie-legend-value {
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 0.8125rem;
+}
+
+/* Reports List */
+.reports-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.report-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-4);
+    background: var(--bg-elevated);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-subtle);
+}
+
+.report-item:hover {
+    border-color: var(--border-default);
+}
+
+.report-icon {
+    width: 40px;
+    height: 40px;
+    background: var(--bg-subtle);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+}
+
+.report-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.report-name {
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 0.875rem;
+}
+
+.report-desc {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+@media (max-width: 1024px) {
+    .grid-cols-2 {
+        grid-template-columns: 1fr;
+    }
+
+    .grid-cols-3 {
+        grid-template-columns: 1fr;
+    }
+
+    [style*="span 2"] {
+        grid-column: span 1 !important;
+    }
+}

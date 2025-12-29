@@ -1,0 +1,283 @@
+.huespedes-page {
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.huespedes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: var(--space-4);
+}
+
+.huesped-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    cursor: pointer;
+    transition: all var(--transition-base);
+}
+
+.huesped-card:hover {
+    border-color: var(--border-strong);
+}
+
+.huesped-card-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    background: var(--bg-elevated);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.huesped-avatar {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    background: var(--bg-subtle);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.frecuente-badge {
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    width: 16px;
+    height: 16px;
+    background: var(--warning);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--bg-base);
+    border: 2px solid var(--bg-elevated);
+}
+
+.huesped-main-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.huesped-nombre {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.huesped-dni {
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+}
+
+.huesped-card-body {
+    padding: var(--space-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.huesped-detail {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+}
+
+.huesped-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-3) var(--space-4);
+    border-top: 1px solid var(--border-subtle);
+}
+
+.huesped-procedencia {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* Profile Modal */
+.modal-lg {
+    max-width: 640px;
+}
+
+.huesped-profile {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+}
+
+.profile-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-4);
+    background: var(--bg-elevated);
+    border-radius: var(--radius-md);
+}
+
+.profile-avatar {
+    position: relative;
+    width: 56px;
+    height: 56px;
+    background: var(--bg-subtle);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.frecuente-badge-lg {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 22px;
+    height: 22px;
+    background: var(--warning);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--bg-base);
+    border: 2px solid var(--bg-surface);
+}
+
+.profile-info h2 {
+    font-size: 1.125rem;
+    margin-bottom: 2px;
+}
+
+.profile-info p {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    margin-bottom: var(--space-2);
+}
+
+.profile-details-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-3);
+}
+
+.profile-detail {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    background: var(--bg-elevated);
+    border-radius: var(--radius-md);
+    color: var(--text-muted);
+}
+
+.profile-detail>div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.profile-notes {
+    padding: var(--space-4);
+    background: var(--bg-elevated);
+    border-left: 3px solid var(--warning);
+    border-radius: var(--radius-md);
+}
+
+.profile-notes h4 {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-bottom: var(--space-2);
+}
+
+.profile-notes p {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.profile-historial h4 {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: var(--space-3);
+}
+
+.historial-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.historial-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-3);
+    background: var(--bg-elevated);
+    border-radius: var(--radius-md);
+}
+
+.historial-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.historial-hab {
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 0.875rem;
+}
+
+.historial-fechas {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.historial-total {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.no-historial {
+    text-align: center;
+    color: var(--text-muted);
+    padding: var(--space-4);
+    font-size: 0.875rem;
+}
+
+@media (max-width: 640px) {
+    .huespedes-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .profile-details-grid {
+        grid-template-columns: 1fr;
+    }
+}

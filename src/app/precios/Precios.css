@@ -1,0 +1,269 @@
+.precios-page {
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+/* Tarifa Cards */
+.tarifa-card {
+    padding: 0;
+    overflow: hidden;
+}
+
+.tarifa-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-4);
+    background: var(--bg-elevated);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.tarifa-tipo {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.tarifa-icon {
+    font-size: 1.25rem;
+}
+
+.tarifa-nombre {
+    font-size: 1rem;
+    font-weight: 500;
+    text-transform: capitalize;
+    color: var(--text-primary);
+}
+
+.tarifa-precios {
+    padding: var(--space-4);
+}
+
+.precio-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+
+.precio-base {
+    text-align: center;
+    padding: var(--space-4);
+    background: var(--bg-elevated);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-4);
+}
+
+.precio-base .precio-value {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.precio-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-3);
+}
+
+.precio-label {
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.precio-value {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.precio-value.baja {
+    color: var(--success);
+}
+
+.precio-value.media {
+    color: var(--primary-500);
+}
+
+.precio-value.alta {
+    color: var(--danger);
+}
+
+/* Temporada Cards */
+.temporada-card {
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    border-top: 3px solid transparent;
+}
+
+.temporada-card.baja {
+    border-top-color: var(--success);
+}
+
+.temporada-card.media {
+    border-top-color: var(--primary-500);
+}
+
+.temporada-card.alta {
+    border-top-color: var(--danger);
+}
+
+.temporada-header {
+    margin-bottom: var(--space-4);
+}
+
+.temporada-icon {
+    font-size: 1.5rem;
+    display: block;
+    margin-bottom: var(--space-2);
+}
+
+.temporada-nombre {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.temporada-dates {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-6);
+    margin-bottom: var(--space-4);
+}
+
+.date-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+
+.date-label {
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+}
+
+.date-value {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.temporada-multiplicador {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    background: var(--bg-elevated);
+    border-radius: var(--radius-md);
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+}
+
+.temporada-multiplicador strong {
+    color: var(--text-primary);
+}
+
+/* Descuentos */
+.descuentos-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.descuento-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-4);
+    background: var(--bg-elevated);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-subtle);
+}
+
+.descuento-item:hover {
+    border-color: var(--border-default);
+}
+
+.descuento-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+
+.descuento-nombre {
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 0.875rem;
+}
+
+.descuento-desc {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+}
+
+.descuento-valor .badge {
+    font-size: 0.75rem;
+    padding: var(--space-1) var(--space-2);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .precio-grid {
+        grid-template-columns: 1fr;
+        gap: var(--space-2);
+    }
+}
+
+@media (max-width: 640px) {
+
+    /* Tabs deslizables en móviles */
+    .tabs {
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        /* Firefox */
+        -ms-overflow-style: none;
+        /* IE and Edge */
+        flex-wrap: nowrap;
+        gap: var(--space-1);
+        padding-bottom: var(--space-2);
+    }
+
+    .tabs::-webkit-scrollbar {
+        display: none;
+        /* Chrome, Safari, Opera */
+    }
+
+    .tab {
+        flex-shrink: 0;
+        white-space: nowrap;
+        min-width: auto;
+    }
+
+    .descuento-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--space-2);
+    }
+
+    .descuento-valor {
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+}

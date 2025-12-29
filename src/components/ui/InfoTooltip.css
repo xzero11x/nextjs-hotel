@@ -1,0 +1,65 @@
+.info-tooltip-container {
+    position: relative;
+    display: inline-block;
+}
+
+.info-tooltip-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+}
+
+.info-tooltip-trigger:hover {
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+}
+
+.info-tooltip-content {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 200px;
+    max-width: 280px;
+    padding: var(--space-3);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    z-index: 100;
+    animation: tooltipFadeIn 0.15s ease;
+}
+
+@keyframes tooltipFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+    .info-tooltip-content {
+        right: auto;
+        left: 50%;
+        transform: translateX(-50%);
+        min-width: 180px;
+        max-width: 240px;
+    }
+}
